@@ -110,7 +110,7 @@ __global__ void gpu_pure_bfly_kernel(uint64_t* soa, size_t stride, uint64_t targ
 // PRODUCTION NETWORK & MAIN
 // ------------------------------------------------------------------
 bool connect_ssl(MinerState* state) {
-    struct hostent* host = getho byname(state->pool_url);
+    struct hostent* host = gethostbyname(state->pool_url);
     struct sockaddr_in serv{}; serv.sin_family = AF_INET; serv.sin_port = htons(state->pool_port);
     if (host) memcpy(&serv.sin_addr, host->h_addr, host->h_length);
     else inet_pton(AF_INET, "172.65.186.4", &serv.sin_addr);
