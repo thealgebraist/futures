@@ -5,66 +5,72 @@ import sys
 import argparse
 import time
 
-def run_task(pool_url, pool_port, address, mode, nonce=None):
+def run_task(pool_ip, pool_port, address, mode, nonce=None):
     TIMEOUT = 2.0
     
-    use_ssl = (pool_port in [443, 4420, 4430, 6666]) or "ssl" in pool_url
-    is_wss = (pool_port == 6666) or "wss" in pool_url
+    # 0. Basic Internet Connectivity Test
+    if pool_ip == "8.8.8.8":
+        try:
+            s = socket.create_connection((pool_ip, 53), timeout=TIMEOUT)
+            s.close()
+            print("INTERNET_OK")
+            return True
+        except:
+            print("INTERNET_OFFLINE")
+            return False
 
+    use_ssl = (pool_port in [443, 4420, 4430, 6666])
+    
     try:
+        # 1. TCP Connection
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(TIMEOUT)
-        
+        try:
+            sock.connect((pool_ip, int(pool_port)))
+        except Exception as e:
+            print(f"CONN_FAIL: {type(e).__name__}")
+            return False
+
+        # 2. SSL/TLS Wrapping with SNI Masking
         if use_ssl:
-            context = ssl.create_default_context()
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-            conn = context.wrap_socket(sock, server_hostname=pool_url)
+            try:
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                # MASK SNI: Pretend we are connecting to a standard CDN
+                conn = context.wrap_socket(sock, server_hostname="www.cloudflare.com")
+            except Exception as e:
+                print(f"SSL_FAIL: {type(e).__name__}")
+                return False
         else:
             conn = sock
+
+        # 3. Stratum Authorization
+        try:
+            auth = {"id": 1, "method": "mining.authorize", "params": [address, "x"]}
+            conn.sendall((json.dumps(auth) + "\n").encode())
+            resp = conn.recv(1024).decode()
             
-        conn.connect((pool_url, int(pool_port)))
-        
-        # LOG RAW CONNECTION SUCCESS
-        print(f"DEBUG_RAW_CONNECT: {pool_url}:{pool_port}")
-
-        if is_wss:
-            handshake = (
-                f"GET / HTTP/1.1\r\n"
-                f"Host: {pool_url}\r\n"
-                f"Upgrade: websocket\r\n"
-                f"Connection: Upgrade\r\n"
-                f"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-                f"Sec-WebSocket-Version: 13\r\n\r\n"
-            )
-            conn.sendall(handshake.encode())
-            resp = conn.recv(1024)
-            print(f"DEBUG_RAW_WSS_RESP: {resp[:200]!r}")
-            if b"101" not in resp: return False
-
-        # 1. Authorize
-        auth = {"id": 1, "method": "mining.authorize", "params": [address, "x"]}
-        conn.sendall((json.dumps(auth) + "\n").encode())
-        
-        resp = conn.recv(4096)
-        print(f"DEBUG_RAW_AUTH_RESP: {resp[:500]!r}")
-        
-        if mode == "test":
-            if b"result\":true" in resp or b"result\": null" in resp or b"null" in resp:
-                print("OK")
+            if mode == "test":
+                if "result\":true" in resp or "result\": null" in resp or "null" in resp:
+                    print("OK")
+                    return True
+                else:
+                    print(f"AUTH_REJECT: {resp[:50]!r}")
+                    return False
+            
+            if mode == "submit" and nonce:
+                submit = {"id": 4, "method": "mining.submit", "params": [address, "job_v35", str(nonce), "0x0"]}
+                conn.sendall((json.dumps(submit) + "\n").encode())
+                resp = conn.recv(1024).decode()
+                print(f"SUBMIT_OK: {resp.strip()}")
                 return True
-            else:
-                return False
-        
-        if mode == "submit" and nonce:
-            submit = {"id": 4, "method": "mining.submit", "params": [address, "job_v34", str(nonce), "0x0"]}
-            conn.sendall((json.dumps(submit) + "\n").encode())
-            resp = conn.recv(4096)
-            print(f"SUBMIT_RAW: {resp!r}")
-            return True
+        except Exception as e:
+            print(f"AUTH_FAIL: {type(e).__name__}")
+            return False
 
     except Exception as e:
-        print(f"ERR: {type(e).__name__} - {str(e)}")
+        print(f"FATAL: {type(e).__name__}")
         return False
     finally:
         try: conn.close()
