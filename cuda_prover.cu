@@ -6,7 +6,7 @@
 #include <cuda_runtime.h>
 
 /**
- * PRODUCTION ALEO PROVER (CUDA / NVIDIA RTX 5090 OPTIMIZED)
+ * SUSTAINED CUDA ALEO PROVER BENCHMARK (10s STRESS TEST)
  */
 
 #define CHECK_CUDA(call) { \
@@ -17,9 +17,6 @@
     } \
 }
 
-// ------------------------------------------------------------------
-// 1. CUDA DEVICE MATH (BLS12-377)
-// ------------------------------------------------------------------
 __constant__ uint64_t P_DEV[6] = {
     0x8508c00000000001, 0x170b5d03340753bb, 0x6662b035c4c2002f, 
     0x1c37f37483c6d17b, 0x247a514d503b2f01, 0x01ae3a4617c30035
@@ -29,10 +26,6 @@ struct Fp377 {
     uint64_t limbs[6];
 };
 
-/**
- * CUDA Device Function: Vectorized Field Addition (PTX Assembly)
- * Uses chained carries to avoid 64-bit shift warnings and undefined behavior.
- */
 __device__ __forceinline__ void add_mod_device(Fp377& a, const Fp377& b) {
     asm volatile(
         "add.cc.u64 %0, %0, %6;\n\t"
@@ -46,67 +39,79 @@ __device__ __forceinline__ void add_mod_device(Fp377& a, const Fp377& b) {
     );
 }
 
-__global__ void nonce_grind_kernel(uint64_t start_nonce, uint64_t target, uint64_t* d_winning_nonce, int* d_found) {
+__global__ void nonce_grind_kernel(uint64_t start_nonce, uint64_t target, uint64_t* d_winning_nonce, int* d_found, unsigned long long* d_total_done) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     uint64_t my_nonce = start_nonce + idx;
     
     Fp377 hash_val = {{my_nonce, my_nonce ^ 0x9E3779B97F4A7C15, 0, 0, 0, 0}};
     Fp377 step_val = {{2, 3, 5, 7, 11, 13}};
     
-    add_mod_device(hash_val, step_val);
+    // Perform 10 rounds of math to prevent optimization and simulate real proof work
+    #pragma unroll
+    for(int i=0; i<10; ++i) {
+        add_mod_device(hash_val, step_val);
+    }
     
-    if (hash_val.limbs[0] < target) {
-        if (atomicExch(d_found, 1) == 0) {
-            *d_winning_nonce = my_nonce;
-        }
+    // Result usage to prevent dead-code elimination
+    if (hash_val.limbs[0] == 0xdeadbeef) {
+        atomicAdd(d_total_done, 1); 
     }
 }
 
-// ------------------------------------------------------------------
-// 2. BENCHMARKING FRAMEWORK
-// ------------------------------------------------------------------
 void run_benchmark() {
     std::cout << "=================================================\n";
-    std::cout << "  CUDA BLS12-377 BENCHMARK (RTX 5090 PROFILING)  \n";
+    std::cout << "  CUDA BLS12-377 BENCHMARK (10s SUSTAINED)       \n";
     std::cout << "=================================================\n";
 
     int threads_per_block = 256;
-    int blocks = 8192; 
-    uint64_t total_hashes = (uint64_t)blocks * threads_per_block;
+    int blocks = 16384; 
+    uint64_t batch_size = (uint64_t)blocks * threads_per_block;
 
     uint64_t* d_winning_nonce;
     int* d_found;
+    unsigned long long* d_total_done;
     CHECK_CUDA(cudaMalloc(&d_winning_nonce, sizeof(uint64_t)));
     CHECK_CUDA(cudaMalloc(&d_found, sizeof(int)));
+    CHECK_CUDA(cudaMalloc(&d_total_done, sizeof(unsigned long long)));
     CHECK_CUDA(cudaMemset(d_found, 0, sizeof(int)));
+    CHECK_CUDA(cudaMemset(d_total_done, 0, sizeof(unsigned long long)));
 
-    uint64_t impossible_target = 0; 
-
-    std::cout << "[BENCH] Launching " << blocks << " blocks of " << threads_per_block << " threads...\n";
-
-    nonce_grind_kernel<<<blocks, threads_per_block>>>(0, impossible_target, d_winning_nonce, d_found);
-    CHECK_CUDA(cudaDeviceSynchronize());
+    std::cout << "[BENCH] Launching " << blocks << " blocks. Stress testing for 10s...\n\n";
 
     auto start = std::chrono::high_resolution_clock::now();
+    uint64_t iterations = 0;
     
-    int iterations = 1000;
-    for(int i=0; i<iterations; ++i) {
-        nonce_grind_kernel<<<blocks, threads_per_block>>>(i * total_hashes, impossible_target, d_winning_nonce, d_found);
+    while (true) {
+        nonce_grind_kernel<<<blocks, threads_per_block>>>(iterations * batch_size, 0, d_winning_nonce, d_found, d_total_done);
+        
+        iterations++;
+        
+        auto now = std::chrono::high_resolution_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
+        
+        if (elapsed >= 10000) break; 
+        
+        if (iterations % 500 == 0) {
+            double current_mh_s = (double)(iterations * batch_size) / (elapsed / 1000.0) / 1e6;
+            std::cout << "\r[TELEMETRY] Elapsed: " << elapsed/1000.0 << "s | Speed: " << current_mh_s << " Mh/s" << std::flush;
+        }
     }
     CHECK_CUDA(cudaDeviceSynchronize());
     
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
     
-    double total_computed = (double)total_hashes * iterations;
+    double total_computed = (double)iterations * batch_size;
     double throughput_mh_s = (total_computed / diff.count()) / 1e6;
 
-    std::cout << "\n[RESULT] Computed " << total_computed << " field hashes in " << diff.count() << " seconds.\n";
-    std::cout << "[RESULT] \033[1;32mCUDA Throughput: " << throughput_mh_s << " Mh/s\033[0m\n";
+    std::cout << "\n\n[RESULT] Finalized 10s Stress Test.\n";
+    std::cout << "[RESULT] Total Computed: " << total_computed << " hashes\n";
+    std::cout << "[RESULT] \033[1;32mAverage Throughput: " << throughput_mh_s << " Mh/s\033[0m\n";
     std::cout << "=================================================\n";
 
     cudaFree(d_winning_nonce);
     cudaFree(d_found);
+    cudaFree(d_total_done);
 }
 
 int main(int argc, char** argv) {
@@ -114,9 +119,6 @@ int main(int argc, char** argv) {
         run_benchmark();
         return 0;
     }
-    std::cout << "=================================================\n";
-    std::cout << "   PRODUCTION CUDA MINER (RTX 5090 READY)        \n";
-    std::cout << "=================================================\n";
-    std::cout << "Run with '--benchmark' to test hardware throughput.\n";
+    std::cout << "Usage: ./cuda_prover --benchmark\n";
     return 0;
 }
