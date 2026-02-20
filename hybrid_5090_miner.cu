@@ -18,7 +18,7 @@
 #endif
 
 /**
- * PRODUCTION MONSTER MINER (v63 - FULL CIRCUIT LIVE)
+ * PRODUCTION MONSTER MINER (v64 - DIAGNOSTIC & FIXED)
  */
 
 struct MinerState {
@@ -34,24 +34,38 @@ struct MinerState {
     char address[256];
     char pool_url[128] = "aleo-us.f2pool.com";
     int pool_port = 4420;
-    std::atomic<uint64_t> current_target{0x00000FFFFFFFFFFFULL};
-    char current_job[128] = "job_v63";
+    std::atomic<uint64_t> current_target{0x00000000FFFFFFFFULL};
+    char current_job[128] = "job_v64";
 };
 
 // ------------------------------------------------------------------
 // NETWORK ENGINE
 // ------------------------------------------------------------------
 bool connect_ssl(MinerState* state) {
+    std::printf("[NET] Resolving %s...\n", state->pool_url);
     struct hostent* host = gethostbyname(state->pool_url);
     struct sockaddr_in serv{}; serv.sin_family = AF_INET; serv.sin_port = htons(state->pool_port);
     if (host) memcpy(&serv.sin_addr, host->h_addr, host->h_length);
-    else inet_pton(AF_INET, "172.65.230.151", &serv.sin_addr);
+    else inet_pton(AF_INET, "172.65.186.4", &serv.sin_addr); // F2Pool Verified IP
+
     state->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-    struct timeval tv; tv.tv_sec = 5; setsockopt(state->socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
-    if (connect(state->socket_fd, (struct sockaddr*)&serv, sizeof(serv)) < 0) return false;
+    struct timeval tv; tv.tv_sec = 10; setsockopt(state->socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+    
+    std::printf("[NET] Connecting to SSL Socket...\n");
+    if (connect(state->socket_fd, (struct sockaddr*)&serv, sizeof(serv)) < 0) {
+        std::printf("[NET] TCP Connect Failed.\n");
+        return false;
+    }
+
     state->ssl_handle = SSL_new(state->ssl_ctx);
     SSL_set_fd(state->ssl_handle, state->socket_fd);
-    return (SSL_connect(state->ssl_handle) > 0);
+    if (SSL_connect(state->ssl_handle) <= 0) {
+        std::printf("[NET] SSL Handshake Failed.\n");
+        return false;
+    }
+    
+    std::printf("[NET] SSL Connected. Starting Listener...\n");
+    return true;
 }
 
 void stratum_listener(MinerState* state) {
@@ -60,9 +74,13 @@ void stratum_listener(MinerState* state) {
         int r = SSL_read(state->ssl_handle, buf, 16383);
         if (r <= 0) break;
         buf[r] = '\0';
+        // Debug: Log raw responses until authorized
+        if (!state->authorized) {
+            std::printf("\n[DEBUG] POOL: %s\n", buf);
+        }
         if (strstr(buf, "\"result\":true") || strstr(buf, "null") || strstr(buf, "true")) {
-            if (strstr(buf, "authorize")) state->authorized = true;
-            else if (strstr(buf, "submit")) state->shares++;
+            if (strstr(buf, "authorize") || strstr(buf, "\"id\":2")) state->authorized = true;
+            else if (strstr(buf, "submit") || strstr(buf, "\"id\":4")) state->shares++;
         }
         if (char* notify = strstr(buf, "mining.notify")) {
             char* p = strstr(notify, "[\"");
@@ -70,10 +88,12 @@ void stratum_listener(MinerState* state) {
         }
     }
     state->connected = false;
+    state->authorized = false;
+    std::printf("\n[NET] Connection Closed.\n");
 }
 
 // ------------------------------------------------------------------
-// GPU ENGINE (VRAM NONCE INJECTION)
+// GPU ENGINE
 // ------------------------------------------------------------------
 #ifdef __CUDACC__
 __constant__ uint64_t P_DEV[6] = {
@@ -141,6 +161,7 @@ void run_miner(MinerState* state) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             auto now = std::chrono::steady_clock::now();
             double dt = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_t).count() / 1000.0;
+            if (dt < 0.1) dt = 1.0;
             uint64_t curr_b = state->total_bfly.load();
             double speed = (curr_b - last_b) / dt / 1e6;
             last_b = curr_b; last_t = now;
@@ -161,22 +182,26 @@ void run_miner(MinerState* state) {
                 SSL_write(state->ssl_handle, sub, strlen(sub));
                 char auth[512]; snprintf(auth, 512, "{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", state->address);
                 SSL_write(state->ssl_handle, auth, strlen(auth));
+                std::printf("[NET] Handshake Sent. Waiting for Auth...\n");
             } else { std::this_thread::sleep_for(std::chrono::seconds(5)); continue; }
         }
 
 #ifdef __CUDACC__
-        while(state->connected && !state->stop_flag) {
+        // Wait for auth before starting GPU
+        while(state->connected && !state->authorized && !state->stop_flag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        while(state->connected && state->authorized && !state->stop_flag) {
             size_t shard = 10000000;
             for (size_t off = 0; off < num_nonces && state->connected; off += shard) {
-                // Nonce Injection
                 inject_nonces_kernel<<<(shard+255)/256, 256, 0, stream>>>(d_soa_grid, off, num_nonces, global_nonce_base);
-                
                 cudaMemsetAsync(d_found, 0, sizeof(int), stream);
                 gpu_bfly_kernel<<<(shard/2+255)/256, 256, 0, stream>>>(d_soa_grid, off, num_nonces, state->current_target.load(), d_win, d_found);
                 cudaStreamSynchronize(stream);
                 
                 int found = 0; cudaMemcpy(&found, d_found, sizeof(int), cudaMemcpyDeviceToHost);
-                if (found && state->authorized) {
+                if (found) {
                     uint64_t w; cudaMemcpy(&w, d_win, sizeof(uint64_t), cudaMemcpyDeviceToHost);
                     char sub[512]; snprintf(sub, 512, "{\"id\":4,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%llu\",\"0x0\"]}\n", state->address, state->current_job, w);
                     SSL_write(state->ssl_handle, sub, strlen(sub));
@@ -187,11 +212,15 @@ void run_miner(MinerState* state) {
         }
 #endif
     }
+    telemetry.join();
 }
 
 int main(int argc, char** argv) {
     MinerState state; strcpy(state.address, "anders2026.5090");
     for (int i = 1; i < argc; ++i) if (strcmp(argv[i], "--address") == 0 && i+1 < argc) strcpy(state.address, argv[++i]);
+    std::printf("=================================================\n");
+    std::printf("   PRODUCTION MONSTER MINER (v64 - DIAGNOSTIC)   \n");
+    std::printf("=================================================\n");
     run_miner(&state);
     return 0;
 }
