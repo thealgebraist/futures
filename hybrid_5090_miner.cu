@@ -75,7 +75,7 @@ void stratum_listener(MinerState* state) {
         }
         if (char* notify = strstr(buf, "mining.notify")) {
             char* p = strstr(notify, "[\"");
-            if (p) { p+=2; char* e = strchr(p, '\"'); if(e){ strncpy(state->current_job, p, e-p); state->current_job[end-p] = '\0'; } }
+            if (p) { p+=2; char* e = strchr(p, '\"'); if(e){ strncpy(state->current_job, p, e-p); state->current_job[e-p] = '\0'; } }
         }
     }
     state->connected = false; state->authorized = false;
