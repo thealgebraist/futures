@@ -1,6 +1,6 @@
 <!-- Imported from: instructions.md -->
 # Current Task
-Deploying and verifying 24h stability of the v16 China-optimized Hybrid Miner on the RTX 5090 Blackwell cluster using automated pool-failover and DNS-bypass.
+Executing a 32-iteration iterative search using Python 3 to identify a functional Aleo pool endpoint, testing all protocols (TCP, SSL, WSS), direct IP bypasses, and SNI masking.
 Agent: Gemini CLI Agent
 Date: 2026-02-20
 <!-- End of import from: instructions.md -->
