@@ -4,6 +4,10 @@ project(AleoOptimizedMiner LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Fix: Set CUDA standard explicitly to 20 (as 23 is not yet supported by nvcc)
+set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
 # 1. Platform Detection
 if(APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
     message(STATUS "Targeting Apple Silicon (NEON Enabled)")
