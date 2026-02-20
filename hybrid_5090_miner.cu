@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <netinet/tcp.h>
 
 #ifdef __CUDACC__
 #include <cuda_runtime.h>
@@ -26,7 +27,7 @@
 #endif
 
 /**
- * PRODUCTION HYBRID MINER (v5) - ROBUST STRATUM & WORKER NAMING
+ * PRODUCTION HYBRID MINER (v6) - OPTIMIZED STRATUM HANDSHAKE
  */
 
 struct MinerState {
@@ -44,9 +45,6 @@ struct MinerState {
     int pool_port;
 };
 
-// ------------------------------------------------------------------
-// GPU KERNEL
-// ------------------------------------------------------------------
 #ifdef __CUDACC__
 __device__ __forceinline__ void add_mod_ptx(uint64_t* a, const uint64_t* b) {
     asm volatile(
@@ -73,36 +71,23 @@ __global__ void gpu_miner_kernel(uint64_t start, uint64_t target, uint64_t* d_wi
 }
 #endif
 
-// ------------------------------------------------------------------
-// STRATUM LISTENER (v5)
-// ------------------------------------------------------------------
 void stratum_listener(MinerState* state) {
     char buf[16384];
     while (!state->stop_flag) {
         memset(buf, 0, sizeof(buf));
         int r = read(state->socket_fd, buf, sizeof(buf) - 1);
         if (r <= 0) {
-            std::printf("\n\033[1;31m[NET]\033[0m Pool closed connection (r=%d).\n", r);
+            std::printf("\n\033[1;31m[NET]\033[0m Pool closed connection (r=%d). Shutting down.\n", r);
             state->stop_flag = true;
             break;
         }
 
-        // Handle results
-        if (strstr(buf, "\"result\":true") || strstr(buf, "\"result\": null") || strstr(buf, "null")) {
-            if (strstr(buf, "mining.authorize") || strstr(buf, "mining.subscribe")) {
-                std::printf("\033[1;32m[NET]\033[0m Handshake Successful.\n");
-            } else {
-                std::printf("\n\033[1;32m[POOL] Share Accepted!\033[0m\n");
-                state->shares.fetch_add(1);
-            }
-        } else if (strstr(buf, "\"error\":")) {
-            std::printf("\n\033[1;31m[POOL] Error Response: %s\033[0m\n", buf);
-            state->rejected.fetch_add(1);
-        }
-
-        // Update jobs
-        if (char* notify = strstr(buf, "mining.notify")) {
-            char* p = strstr(notify, "[\"");
+        // Print raw responses for debugging if needed
+        if (strstr(buf, "\"result\":true") || strstr(buf, "\"result\":true")) {
+            std::printf("\n\033[1;32m[POOL]\033[0m Response: OK (Authorized/Accepted)\n");
+            if (strstr(buf, "mining.submit")) state->shares++;
+        } else if (strstr(buf, "mining.notify")) {
+            char* p = strstr(buf, "[\"");
             if (p) {
                 p += 2; char* end = strchr(p, '\"');
                 if (end) {
@@ -111,37 +96,41 @@ void stratum_listener(MinerState* state) {
                     state->current_job[len] = '\0';
                 }
             }
-            std::printf("\033[1;34m[NET]\033[0m New Job: %s\n", state->current_job);
+            std::printf("\n\033[1;34m[NET]\033[0m Received Work: %s\n", state->current_job);
+        } else if (strstr(buf, "\"error\":")) {
+            std::printf("\n\033[1;31m[POOL] Rejected: %s\033[0m\n", buf);
+            state->rejected++;
         }
     }
 }
 
 void run_miner(MinerState* state) {
-    std::printf("\033[1;32m[START]\033[0m Connecting to %s:%d...\n", state->pool_ip, state->pool_port);
+    std::printf("\033[1;32m[START]\033[0m Establishing TCP to %s:%d...\n", state->pool_ip, state->pool_port);
     
     state->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int flag = 1;
+    setsockopt(state->socket_fd, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
+
     struct sockaddr_in serv{};
     serv.sin_family = AF_INET;
     serv.sin_port = htons(state->pool_port);
     inet_pton(AF_INET, state->pool_ip, &serv.sin_addr);
 
     if (connect(state->socket_fd, (struct sockaddr*)&serv, sizeof(serv)) < 0) {
-        std::printf("[ERROR] Connection failed.\n");
+        std::printf("[ERROR] Failed to connect to IP %s\n", state->pool_ip);
         return;
     }
 
-    // Handshake Part 1: Subscribe
-    const char* sub = "{\"id\":1,\"method\":\"mining.subscribe\",\"params\":[\"aleo-miner/1.0.0\",null,\"aleo.hk.apool.io\",\"9090\"]}\n";
-    send(state->socket_fd, sub, strlen(sub), 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // Start listener BEFORE handshake
+    std::thread listener(stratum_listener, state);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // Handshake Part 2: Authorize
+    // Send Authorization (The most critical packet)
     char auth[512];
-    snprintf(auth, 512, "{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", state->address);
+    snprintf(auth, 512, "{\"id\":1,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"\"]}\n", state->address);
+    std::printf("\033[1;34m[NET]\033[0m Sending Authorize: %s", auth);
     send(state->socket_fd, auth, strlen(auth), 0);
 
-    std::thread listener(stratum_listener, state);
-    
 #ifdef __CUDACC__
     std::thread gpu_worker([&]() {
         uint64_t* d_win; CHECK_CUDA(cudaMalloc(&d_win, sizeof(uint64_t)));
@@ -156,7 +145,7 @@ void run_miner(MinerState* state) {
             int found = 0; CHECK_CUDA(cudaMemcpy(&found, d_found, sizeof(int), cudaMemcpyDeviceToHost));
             if (found && !state->stop_flag) {
                 uint64_t winner; CHECK_CUDA(cudaMemcpy(&winner, d_win, sizeof(uint64_t), cudaMemcpyDeviceToHost));
-                std::printf("\n\033[1;33m[SUCCESS]\033[0m Found Nonce: %llu. Submitting...\n", winner);
+                std::printf("\n\033[1;33m[SUCCESS]\033[0m Hit target! Nonce: %llu\n", winner);
                 
                 char submit[1024];
                 snprintf(submit, 1024, "{\"id\":4,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%llu\",\"0x0\"]}\n",
@@ -186,19 +175,16 @@ void run_miner(MinerState* state) {
 
 int main(int argc, char** argv) {
     MinerState state;
-    const char* default_addr = "aleo1wss37wdffev2ezdz4e48hq3yk9k2xenzzhweeh3rse7qm8rkqc8s4vp8v3.worker_m2";
+    const char* default_addr = "aleo1wss37wdffev2ezdz4e48hq3yk9k2xenzzhweeh3rse7qm8rkqc8s4vp8v3.worker_gpu";
     strcpy(state.address, default_addr);
     strcpy(state.pool_ip, "172.65.162.169");
     state.pool_port = 9090;
-    strcpy(state.current_job, "initial_job");
+    strcpy(state.current_job, "init");
 
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--address") == 0 && i + 1 < argc) {
             strcpy(state.address, argv[++i]);
-            // Fix: Ensure worker name exists
-            if (strchr(state.address, '.') == NULL) {
-                strcat(state.address, ".worker_gpu");
-            }
+            if (strchr(state.address, '.') == NULL) strcat(state.address, ".worker_gpu");
         }
         if (strcmp(argv[i], "--pool") == 0 && i + 1 < argc) {
             char* p = strchr(argv[i+1], ':');
@@ -209,9 +195,8 @@ int main(int argc, char** argv) {
     }
 
     std::printf("=================================================\n");
-    std::printf("   PRODUCTION HYBRID MINER (v5)                  \n");
-    std::printf("   Address: %s\n", state.address);
-    std::printf("   Pool:    %s:%d\n", state.pool_ip, state.pool_port);
+    std::printf("   PRODUCTION HYBRID MINER (v6)                  \n");
+    std::printf("   Target: RTX 5090 Blackwell                    \n");
     std::printf("=================================================\n\n");
 
     run_miner(&state);
