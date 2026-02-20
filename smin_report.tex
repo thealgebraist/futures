@@ -1,0 +1,37 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{underscore}
+\usepackage{verbatim} % Required for \verbatiminput
+
+\title{Analysis of India Small-Cap ETF (SMIN) Returns}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report analyzes the high-frequency (15-minute) return dynamics of the iShares MSCI India Small-Cap ETF (SMIN). We employ eigenvalue decomposition to understand market stability and a Piecewise Linear FFNN to test predictive profitability.
+
+\section{Eigenvalue Analysis}
+The rolling eigenvalue spectrum of the lagged return matrix ($T=10$ lags) reveals the underlying dimensionality of the market signal.
+\begin{center}
+    \includegraphics[width=0.8\textwidth]{data/india_etf/smin_eigen_spectrum.png}
+\end{center}
+\verbatiminput{smin_analysis_results.txt}
+
+\section{Trading Simulation}
+A 32-neuron PWL-FFNN was trained for 60 seconds on the first 80\% of the data and tested on the remaining 20\% with a starting capital of \$100.00.
+
+\textbf{Final Capital:} \$\input{smin_final_capital.txt}
+
+\section{Conclusion}
+The eigenvalue analysis indicates a dominant market mode with a high mean max eigenvalue, suggesting strong correlations in short-term volatility. The trading simulation resulted in a final capital of \textbf{\$99.90}, essentially breaking even (minus commissions). This suggests that while the model avoided catastrophic loss, the signal-to-noise ratio in 15-minute SMIN returns is too low for a simple 32-neuron network to exploit profitably after transaction costs.
+
+\end{document}

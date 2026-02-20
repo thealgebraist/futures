@@ -1,0 +1,57 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+	itle{Energy Trading Optimization: 8-Iteration FFNN Analysis}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report details the results of an 8-iteration optimization process for indirect energy trading. We evaluated eight different assets (ETFs, Stocks, and Futures) using a 32-neuron Feed-Forward Neural Network (FFNN) implemented in C++23. The goal was to achieve a profit from a starting capital of \$100.00 over a simulated month of unseen data.
+
+\section{Methodology}
+\begin{itemize}
+    \item 	extbf{Model:} 32-neuron FFNN with Tanh activation.
+    \item 	extbf{Data:} 15-minute interval returns for 60 days.
+    \item 	extbf{Training:} 60 seconds per iteration using R-Adam and Gradient Clipping.
+    \item 	extbf{Optimization Loop:} After each iteration, the learning rate was adjusted based on the PnL of the previous asset to "improve" the training profile for the next.
+\end{itemize}
+
+\section{Results}
+The following table summarizes the final capital after one month of simulated trading for each asset.
+
+\begin{center}
+\begin{tabular}{lrr}
+	oprule
+Asset & Final Capital (\$) & Final Learning Rate 
+\midrule
+USO (Oil ETF) & 75.67 & 0.001000 
+UNG (Nat Gas ETF) & 87.76 & 0.000500 
+XLE (Energy Sector) & 83.90 & 0.000250 
+XOM (Exxon Mobil) & 68.79 & 0.000125 
+CVX (Chevron) & 100.00 & 0.000063 
+NEE (NextEra) & 79.89 & 0.000075 
+CL=F (Crude Oil) & 98.61 & 0.000038 
+NG=F (Nat Gas) & 89.56 & 0.000019 
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Analysis}
+\begin{enumerate}
+    \item 	extbf{Profitability Challenge:} None of the iterations resulted in a significant net profit above the starting \$100.00. CVX maintained the capital, while others saw drawdowns of 10-30\%.
+    \item 	extbf{Learning Rate Sensitivity:} Conservative learning rates (e.g., $1.8 	imes 10^{-5}$) showed slightly better stability in futures (CL=F, NG=F) compared to more aggressive rates used earlier in the loop.
+    \item 	extbf{Asset Comparison:} Crude Oil futures (CL=F) and Chevron (CVX) were the most resilient to the FFNN's predictive noise, finishing closest to the initial balance.
+\end{enumerate}
+
+\section{Conclusion}
+Indirect energy trading using a simple 32-neuron FFNN on 15-minute data is highly challenging for a \$100 account. The primary obstacle remains the high signal-to-noise ratio in intraday returns and the erosion of capital from commissions/slippage. More sophisticated architectures or longer-term timeframes may be required for consistent profitability.
+
+\end{document}

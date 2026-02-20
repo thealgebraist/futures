@@ -1,0 +1,2 @@
+Mean_Max_Eigenvalue: 1.5622
+Total_Windows: 1364

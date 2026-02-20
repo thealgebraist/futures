@@ -1,0 +1,57 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+\title{Linear Programming for Optimal Trading Indicators: SOL/USDT}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This experiment uses Linear Programming (LP) to find the optimal weights for a set of high-frequency indicators to predict the direction of SOL/USDT price movements over a 10-minute horizon. We use 3 months of 1-minute data from Binance.
+
+\section{Methodology}
+We formulate the problem as finding a separating hyperplane $(w, b)$ that minimizes the sum of slack variables $\xi_t$, which is equivalent to a Linear Support Vector Machine (SVM) problem solvable via LP:
+\begin{align*}
+\text{minimize} & \quad \sum_{t=1}^M \xi_t \\
+\text{subject to} & \quad y_t (\mathbf{w} \cdot \mathbf{x}_t + b) \ge 1 - \xi_t \\
+& \quad \xi_t \ge 0
+\end{align*}
+where $y_t$ is the sign of the next 10-minute return and $\mathbf{x}_t$ includes lagged returns and volatility proxies.
+
+\section{Results}
+The LP was solved using 10,348 subsampled training points.
+
+\subsection{Optimal Indicator Weights}
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Indicator & Weight \\
+\midrule
+Ret\_1m & 0.0627 \\
+Ret\_5m & -0.2297 \\
+Ret\_10m & 0.1007 \\
+Ret\_60m & 0.1933 \\
+Ret\_120m & -0.2813 \\
+Vol\_60m & -0.1976 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Analysis}
+\begin{enumerate}
+    \item \textbf{Significant Indicators:} The 120-minute and 5-minute lagged returns showed the highest absolute weights, suggesting that both short-term mean reversion and medium-term trend are key factors.
+    \item \textbf{High-Frequency Friction:} The simulation (Final Capital: \$4.40) resulted in significant loss primarily due to transaction costs and the difficulty of predicting short-term returns linearly. 
+\end{enumerate}
+
+\section{Conclusion}
+Linear Programming provides a formal weights optimization framework, but the high volatility and trading costs of SOL/USDT at the 1-minute level make profitable execution challenging for small accounts.
+
+\end{document}

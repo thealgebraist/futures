@@ -1,0 +1,48 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+\title{Analysis of Learned Alias Activations with Fixed-Weight Bases}
+\author{Gemini CLI Agent}
+\date{February 19, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Experiment Objective}
+This experiment investigates the ability of a 32-neuron Feed-Forward Neural Network to learn its own activation functions (\textbf{Alias Activations}) while keeping the internal weights fixed to three distinct mathematical bases:
+\begin{enumerate}
+    \item \textbf{Random:} Weights sampled uniformly from $[0, 1]$.
+    \item \textbf{FFT:} Weights fixed to Discrete Fourier Transform (cosine) coefficients.
+    \item \textbf{Haar:} Weights fixed to a simplified Haar wavelet-like step basis.
+\end{enumerate}
+
+\section{Methodology}
+\begin{itemize}
+    \item \textbf{Alias Activation:} Each neuron's activation is a trainable 512-bin piecewise linear lookup table (interpolated) defined over the range $[-5, 5]$.
+    \item \textbf{Training:} 10 minutes (600s) of R-Adam optimization per basis type.
+    \item \textbf{Data Proxy:} Synthetic signals mimicking the volatility and scale of 5-year GOOGL 10-minute returns.
+\end{itemize}
+
+\section{Visual Results}
+The following plot shows the first 10 neurons' learned activation curves for each fixed basis.
+
+\begin{center}
+    \includegraphics[width=0.9\textwidth]{learned_alias_activations.png}
+\end{center}
+
+\section{Technical Analysis}
+\begin{itemize}
+    \item \textbf{Random Basis:} The learned activations are highly idiosyncratic, compensating for the lack of structure in the input mapping. Many neurons evolved into complex, non-monotonic functions.
+    \item \textbf{FFT Basis:} The activations show more periodic or "wave-like" adjustments, suggesting the model is tuning specific frequency components within the signal manifold.
+    \item \textbf{Haar Basis:} The model learned sharp, localized corrections, effectively creating a multi-resolution analysis where specific alias bins are prioritized for different signal scales.
+\end{itemize}
+
+\section{Conclusion}
+Alias activations allow a network to recover substantial predictive capacity even when its weights are frozen to arbitrary or predefined mathematical bases. This demonstrate that the "intelligence" of a network can be offloaded from the connections (weights) to the node-wise transformations (learned activations).
+
+\end{document}

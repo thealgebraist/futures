@@ -1,0 +1,56 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\title{FFNN Predictive Analysis: 16-to-4 10min Futures Prediction}
+\author{Antigravity Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Task Description}
+The objective was to predict the next 4 10-minute values of the \texttt{NQ=F} future given the previous 16 values. This task evaluates the model's ability to capture short-term dynamics and regime shifts in a multifractal environment.
+
+\section{Model and Training Configuration}
+As per the specified constraints:
+\begin{itemize}
+    \item \textbf{Architecture}: 512-neuron FFNN (Feed-Forward Neural Network).
+    \item \textbf{Activation}: ReLU.
+    \item \textbf{Optimizer}: R-Adam (Rectified Adam).
+    \item \textbf{Gradient Clipping}: 5.0.
+    \item \textbf{Batch Size}: 32.
+    \item \textbf{Training Duration}: 120 seconds.
+    \item \textbf{Data Split}: 80\% training, 20\% testing.
+\end{itemize}
+
+\section{Performance Metrics}
+The model was trained for 367 epochs within the 120-second window.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Test MSE (Normalized) & 0.021203 \\
+Training Epochs & 367 \\
+Final Training Loss (MSE) & $\approx 0.003106$ \\
+\bottomrule
+\end{tabular}
+\caption{Predictive Performance Summary}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{predictive_error_curve.png}
+\caption{Training MSE (log-scale) over 120 seconds of training.}
+\end{figure}
+
+\section{Analysis}
+The model shows steady convergence, reducing the MSE by over two orders of magnitude within the training window. The low test MSE suggests that the 512-neuron FFNN effectively captures the local dependencies and drift modeled in the preceding Monte Carlo analysis.
+
+\end{document}

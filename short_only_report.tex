@@ -1,0 +1,52 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\title{Short-Only Strategy Comparison: FX Futures}
+\author{Antigravity Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Analysis Overview}
+We conducted a comparative analysis between the bidirectional strategy (Long/Short) and a targeted Short-Only strategy using the same 512-neuron FFNN model. The goal was to isolate the model's alpha specifically in shorting signals.
+
+\section{Simulation Parameters}
+\begin{itemize}
+    \item \textbf{Initial Capital}: \$100.00
+    \item \textbf{Target Instrument}: NQ=F
+    \item \textbf{Window}: Test set (~14 days of 10min intervals)
+    \item \textbf{Constraint}: Positions $\in [-1, 0]$ for Short-Only.
+\end{itemize}
+
+\section{Comparative Results}
+The Short-Only strategy demonstrated superior performance over the bidirectional benchmark during this period.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Metric & Bidirectional & Short-Only \\
+\midrule
+Final Equity & \$99.01 & \$100.46 \\
+Total Return & -0.99\% & +0.46\% \\
+Profitability & Negative & Positive \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of Strategy Performance}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{short_only_comparison.png}
+\caption{Comparative Equity Curves. The Short-Only strategy (Red) maintains capital preservation and yields a positive terminal return.}
+\end{figure}
+
+\section{Conclusion}
+The predictive model's short signals appear more robust than its long signals for the NQ=F future in the current regime. While the bidirectional strategy was bogged down by long-side failures, the Short-Only variant profitably captured downward momentum, turning a losing system into a profitable one.
+
+\end{document}

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@aleohq/sdk": "^0.6.9",
+    "ws": "^8.19.0"
+  }
+}

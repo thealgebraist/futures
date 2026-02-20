@@ -1,0 +1,4 @@
+training_time: 1200
+final_equity: 103.67
+num_trades: 917
+best_val_loss: 0.00003057

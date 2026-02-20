@@ -1,0 +1,45 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{High-Intensity Multistep Audit: GOOGL and SOLUSDT}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This audit evaluates the performance of a high-capacity (512-neuron) Levy Stable FFNN configured for multistep forecasting. Unlike previous single-step audits, this model consumes the last 16 intervals (10-minute resampled) and predicts the next 4 intervals simultaneously.
+
+\section{Methodology}
+\begin{itemize}
+    \item \textbf{Architecture:} 512-neuron FFNN with stochastic Levy-tanh activations.
+    \item \textbf{Training Intensity:} 10 minutes (600s) per asset using Apple Accelerate.
+    \item \textbf{Task:} 16-step input $\to$ 4-step output vector prediction.
+    \item \textbf{Backend:} C++23 with R-Adam and Gradient Clipping (5.0).
+\end{itemize}
+
+\section{Results}
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Asset & Final Test MSE & Training Steps \\
+\midrule
+GOOGL & 136.08 & 211,714 \\
+SOLUSDT & 523.49 & 210,182 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Analysis}
+The transition to a 512-neuron multistep model resulted in significant training throughput (~210k steps in 10 minutes). However, the final test MSE remains high, particularly for SOLUSDT. This indicates that predicting 4 future steps simultaneously is a substantially more difficult manifold to learn than single-step prediction, as the joint distribution of future returns contains complex dependencies that the current 512-neuron unconstrained model struggled to minimize.
+
+\section{Conclusion}
+The high-intensity audit confirms the computational efficiency of the C++23 Accelerate backend. While the model successfully processed hundreds of thousands of steps, the multistep error levels suggest that either a larger model (e.g., 1024+ neurons) or a more sophisticated recursive architecture (LSTM/Transformer) is required to capture the joint temporal structure of high-frequency returns.
+
+\end{document}

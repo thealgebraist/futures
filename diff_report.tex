@@ -1,0 +1,61 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{Continuous-Depth and Liquid Time-Constant Models in Futures Trading}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report evaluates two advanced differential neural architectures applied to futures price prediction: \textbf{Neural Ordinary Differential Equations (Neural ODEs)} and \textbf{Liquid Time-Constant (LTC)} networks. These models generalize discrete-layer neural networks into continuous-time dynamical systems.
+
+\section{Methodology}
+The models were trained on 10-minute interval data for 8 futures symbols (ES, NQ, RTY, CL, GC, MES, MNQ, M2K). The target variable was the next price of the Micro E-mini S\&P 500 (MES).
+
+\subsection{Neural ODE}
+The Neural ODE models the hidden state transformation as an integral of a vector field:
+\begin{equation}
+h(1) = h(0) + \int_0^1 f(h(t), t, \theta) dt
+\end{equation}
+This architecture treats depth as a continuous variable, potentially offering better parameter efficiency and stability through Jacobian constraints.
+
+\subsection{Liquid Time-Constant (LTC)}
+LTCs are inspired by biological neural circuits and model the hidden state with a time-dependent time constant:
+\begin{equation}
+\frac{dh}{dt} = - \left[ \frac{1}{\tau} + f(x, t) \right] h + f(x, t) A
+\end{equation}
+This allows the network to adapt its internal dynamics to the timescale of the input data, which is particularly useful for financial time series with irregular or complex temporal dependencies.
+
+\section{Results}
+Both models were trained for 120 seconds. The final Mean Squared Error (MSE) on the out-of-sample test set is summarized below.
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Model & Final Test MSE \\
+\midrule
+Neural ODE & 48.32 \\
+Liquid Time-Constant (LTC) & 58.32 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Analysis}
+The MSE values for both differential models are significantly higher than the discrete LSTM models previously tested. This may be due to several factors:
+\begin{enumerate}
+    \item \textbf{Training Complexity:} Solving an ODE during the forward and backward passes is computationally expensive. Within the 120-second training limit, these models likely did not achieve convergence.
+    \item \textbf{Discretization Noise:} The transition from discrete financial data to a continuous ODE solver (e.g., Runge-Kutta) can introduce numerical artifacts if the vector field is not sufficiently smooth.
+    \item \textbf{Hyperparameter Sensitivity:} Differential models are highly sensitive to the initialization of the vector field and the choice of solver tolerances.
+\end{enumerate}
+
+\section{Conclusion}
+While Neural ODEs and LTCs offer a mathematically elegant generalization of neural networks, their practical application to high-frequency futures trading requires significant computational resources and careful tuning of the underlying dynamical systems. For the current 10-minute interval task, discrete architectures like LSTMs remain more effective within limited training windows.
+
+\end{document}

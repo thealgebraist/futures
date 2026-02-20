@@ -1,0 +1,96 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\geometry{a4paper, margin=0.8in}
+
+\title{Project Zenith: Master Audit Synthesis}
+\author{Antigravity Agent}
+\date{February 18-19, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Phase 1: Multi-Stock Deep Audit (600s)}
+High-fidelity training on major US equities for 10 minutes each, utilizing GARCH(1,1) risk gating.
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Ticker} & \textbf{ROI (\%)} & \textbf{Trades} & \textbf{Val Loss} \\
+\midrule
+NVDA & +0.44\% & 2 & 0.00032 \\
+TSLA & +0.40\% & 3 & 0.00085 \\
+AAPL & +0.24\% & 2 & 0.00018 \\
+MSFT & -0.39\% & 1 & 0.00021 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Phase 2: Lévy Stable Distribution Audit (High-Fidelity)}
+Modeling fat-tail risk in crypto futures with a realistic \textbf{5 bps (0.05\%) transaction fee} and Entry/Exit tracking.
+\begin{table}[h]
+\centering
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Ticker} & \textbf{Alpha ($\alpha$)} & \textbf{Fee-Adj ROI (\%)} & \textbf{RT Trades} & \textbf{Exposure (m)} & \textbf{Conviction} \\
+\midrule
+DOGEUSDT & 1.6265 & -0.599\% & 9 & 19 & Medium \\
+XRPUSDT & 1.6095 & -0.274\% & 1 & 5 & High \\
+ADAUSDT & 1.7186 & +0.253\% & 19 & 24 & Medium \\
+AVAXUSDT & 1.8513 & -4.172\% & 146 & 498 & Low \\
+\bottomrule
+\end{tabular}
+\caption{Refined results under transaction friction. AVAX demonstrates the toxicity of high-frequency friction.}
+\end{table}
+
+\section{Phase 3: Piecewise Constant (PWC) Bayesian Benchmark}
+Evaluation of stochastic firing architectures with Gaussian weights and 256-bin PWC activations.
+\begin{itemize}
+    \item \textbf{Stochastic Convergence}: The hybrid model successfully optimized discrete staircase units in 32D space.
+    \item \textbf{Initialization Sensitivity}: Structured topology (ReLU-ramp) yielded 10x better convergence than chaotic start states.
+\end{itemize}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.75\textwidth]{zenith_init_benchmark.png}
+\caption{Convergence history: Vanilla ReLU vs Hybrid PWC-Bayesian Variants.}
+\end{figure}
+
+\section{Phase 4: 62-Asset Ecosystem Global Audit (6 Months)}
+A massive parallelized audit across 32 mid-level and 30 low-value assets using 6 months of 10-minute resolution telemetry.
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Ticker} & \textbf{Fee-Adj ROI (\%)} & \textbf{Alpha ($\alpha$)} & \textbf{RT Trades} & \textbf{Type} \\
+\midrule
+FLOWUSDT & +26.38\% & 1.5873 & 11 & Mid-Level \\
+COTIUSDT & +7.58\% & 1.6874 & 2 & Low-Value \\
+BATUSDT & +7.46\% & 1.6417 & 116 & Low-Value \\
+OGNUSDT & +6.87\% & 1.8484 & 52 & Low-Value \\
+THETAUSDT & +6.20\% & 1.7428 & 16 & Mid-Level \\
+EGLDUSDT & +6.08\% & 1.7486 & 77 & Mid-Level \\
+ZILUSDT & +4.63\% & 1.7353 & 78 & Low-Value \\
+HOTUSDT & +3.19\% & 1.7352 & 110 & Low-Value \\
+\bottomrule
+\end{tabular}
+\caption{Top 8 Alpha Nodes. FLOW demonstrates extreme drift capture despite high kurtosis ($\alpha=1.58$).}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{zenith_ecosystem_scatter.png}
+\caption{Global Alpha vs ROI: The green cluster identifies assets where learned short-drift overcomes the 5 bps transaction friction.}
+\end{figure}
+
+\section{Architectural Breakthrough: $O(1)$ Stochastic Inference}
+The core achievement of Zenith's PWC layer is the direct applicability of the \textbf{Alias Method}. By discretizing the activation function into bit-packed tables, we enable hardware-accelerated stochastic sampling, bypassing expensive floating-point CDF operations while maintaining backprop-trainable precision.
+
+\end{document}

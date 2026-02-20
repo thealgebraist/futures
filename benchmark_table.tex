@@ -1,0 +1,16 @@
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Activation Function & Err Reduct/s & Iterations/s \\
+\midrule
+Alias (32 bins) & 0.20304 & 2480814 \\
+Vanilla (ReLU) & 0.178318 & 3648564 \\
+Stoch. Gaussian & 0.177267 & 1096456 \\
+Leaky ReLU & 0.181991 & 3674772 \\
+Uniform [-1, 1] & 0.184667 & 2577889 \\
+Uniform [0, 1] & 0.182434 & 2439181 \\
+\bottomrule
+\end{tabular}
+\caption{Activation Function Benchmark (16 problems, 4s each)}
+\end{table}

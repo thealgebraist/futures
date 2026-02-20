@@ -1,0 +1,59 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{Generalization Scaling Analysis: Neuron Count vs. Test Performance}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report analyzes the generalization performance of a Discontinuous PWL-FFNN model as a function of the number of hidden neurons $n \in \{1, 2, 4, \dots, 256\}$. The task is to predict the next 10-minute price change (return) for 16 diverse futures based on the previous 160 minutes of historical changes.
+
+\section{Experimental Setup}
+\begin{itemize}
+    \item \textbf{Input:} 256 features (16 steps $\times$ 16 futures returns).
+    \item \textbf{Output:} 16 features (next step returns for all futures).
+    \item \textbf{Dataset:} 60 days of 10-minute resampled price changes.
+    \item \textbf{Training:} 10 minutes total, distributed across all configurations.
+    \item \textbf{Implementation:} C++23 with Apple Accelerate.
+\end{itemize}
+
+\section{Results}
+The following table summarizes the Mean Squared Error (MSE) on the unseen test set for each configuration.
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Neurons ($n$) & Test MSE \\
+\midrule
+1 & $8.97 \times 10^{-6}$ \\
+2 & $6.47 \times 10^{-6}$ \\
+4 & \textbf{$6.46 \times 10^{-6}$} \\
+8 & $6.52 \times 10^{-6}$ \\
+16 & $6.52 \times 10^{-6}$ \\
+32 & $6.60 \times 10^{-6}$ \\
+64 & $6.58 \times 10^{-6}$ \\
+128 & $6.76 \times 10^{-6}$ \\
+256 & $6.99 \times 10^{-6}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Analysis}
+\begin{enumerate}
+    \item \textbf{Optimal Model Size:} The best generalization was achieved with a very small number of neurons ($n=4$). This suggests that the signal-to-noise ratio in 10-minute futures returns is low, and larger models quickly begin to overfit to the training noise rather than capturing generalizable market patterns.
+    \item \textbf{Returns vs. Prices:} Using price changes (returns) instead of raw price values resulted in significantly lower absolute MSE values (order of $10^{-6}$), confirming that returns are a more stationary and suitable target for neural network forecasting.
+    \item \textbf{Scaling Diminishing Returns:} Beyond $n=4$, the test MSE remained relatively flat or slightly increased, indicating that the added complexity did not provide a corresponding improvement in out-of-sample accuracy.
+\end{enumerate}
+
+\section{Conclusion}
+For high-frequency multi-variate futures return prediction, compact architectures are superior for generalization. A PWL-FFNN with approximately 4 neurons provides the optimal balance of capacity and robustness against overfitting in the 10-minute forecasting window.
+
+\end{document}

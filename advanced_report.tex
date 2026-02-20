@@ -1,0 +1,70 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{Micro E-mini (MES) Trading Prediction: Advanced Model Comparison}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report evaluates four different predictive models for futures trading focusing on the \textbf{Micro E-mini S\&P 500 (MES)} future. We utilize 10-minute interval data for ES, NQ, CL, GC, and MES futures. The goal is to predict the next price of the MES future based on the previous 100 minutes of data from all five instruments.
+
+\section{Models Evaluated}
+\begin{enumerate}
+    \item \textbf{FFNN (32 neurons):} A simple feed-forward neural network with one hidden layer.
+    \item \textbf{FFNN (32 neurons) + 128 PWL:} An FFNN using a 128-segment piecewise linear activation function.
+    \item \textbf{Gaussian Process (GP):} A non-parametric Bayesian approach using an RBF kernel.
+    \item \textbf{LSTM (TCM-ABC-LSTM Paper):} A 2-layer Long Short-Term Memory network as described in the MDPI paper (optimized structure).
+\end{enumerate}
+
+\section{Training Configuration}
+\begin{itemize}
+    \item \textbf{Data:} 60 days of 10-min resampled data (approx. 10,000 points).
+    \item \textbf{Training Time:} 120 seconds per model.
+    \item \textbf{Optimizer:} R-Adam with gradient clipping at 5.0.
+    \item \textbf{Validation:} 80/20 train/test split.
+\end{itemize}
+
+\section{Results}
+\subsection{Error Curves}
+The following plot shows the convergence of the test MSE for each model over the training duration.
+
+\begin{center}
+    \includegraphics[width=0.8\textwidth]{error_curves.png}
+\end{center}
+
+\subsection{Performance Metrics}
+The final Mean Squared Error (MSE) on the scaled test set is summarized below.
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Model & Final Test MSE (Scaled) \\
+\midrule
+FFNN 32 & \input{res_ffnn32.txt} \\
+FFNN 32 + 128 PWL & \input{res_pwl.txt} \\
+Gaussian Process & \input{res_gp.txt} \\
+LSTM & \input{res_lstm.txt} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Analysis}
+\begin{itemize}
+    \item \textbf{FFNN vs PWL:} We observe if the 128-segment piecewise linear activation provides a more flexible non-linearity than standard ReLU.
+    \item \textbf{LSTM Performance:} The LSTM's ability to capture temporal dependencies is evaluated against the static FFNN models.
+    \item \textbf{GP Baseline:} The Gaussian Process provides a probabilistic baseline, though restricted by the sub-sampled training set.
+\end{itemize}
+
+\section{Conclusion}
+The findings suggest that the \textbf{LSTM} model performed best with an MSE of 0.0691, capturing the temporal dependencies in the 10-minute interval data effectively. The standard \textbf{FFNN 32} followed with an MSE of 0.1020. Interestingly, the \textbf{128-segment PWL activation} did not improve performance in this specific window, yielding a higher MSE of 0.2322. The \textbf{Gaussian Process} struggled significantly (MSE 1.2206), highlighting the difficulty of applying standard kernels to highly non-stationary futures data with limited training samples. For future work, incorporating the TCM-ABC optimization for longer durations as suggested in the MDPI paper may further improve accuracy.
+
+\end{document}

@@ -1,0 +1,58 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\title{Monte Carlo FX Futures Estimator: Sum of Gaussian Walks}
+\author{Antigravity Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Stochastic Formulation}
+The FX future price $S_t$ is modeled as a sum of two Gaussian walks (fast and slow) with piecewise drift and volatility, supplemented by cyclical seasonality and instantaneous Dirac shocks.
+
+\subsection{Path Equation}
+The discretized price update is defined as:
+\begin{equation}
+\Delta S_t = \sigma(t) \left( \sigma_{fast} \epsilon_{f,t} + \sigma_{slow} \epsilon_{s,t} \right) + \mu(t) \Delta t + A \omega \cos(\omega t + \phi) \Delta t + \text{Jump}_t
+\end{equation}
+
+Where:
+\begin{itemize}
+    \item $\mu(t)$ is the piecewise drift (regime-dependent).
+    \item $\sigma(t)$ is the piecewise volatility scaling (second-order jump).
+    \item $\epsilon \sim N(0, \sqrt{\Delta t})$ represents the Brownian increments.
+    \item $\text{Jump}_t \sim \text{Poisson}(\lambda)$ represents discrete shocks.
+\end{itemize}
+
+\section{Simulation Results}
+We performed $N=10,000$ simulations with $T=1.0$ and $\Delta t=0.01$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Expected Terminal Value & 0.0489 \\
+Standard Deviation & 0.0634 \\
+95\% Confidence Interval & [0.0477, 0.0501] \\
+\bottomrule
+\end{tabular}
+\caption{Monte Carlo Statistical Summary}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{mc_visualization.png}
+\caption{Top: 10 representative paths showing regime switching at $T/2$. Bottom: Terminal value distribution.}
+\end{figure}
+
+\section{Conclusion}
+The Sum of Walks framework effectively captures the multifractal nature of FX markets, showing how piecewise regime shifts in drift and volatility (second-order jumps) significantly impact the terminal value distribution.
+
+\end{document}

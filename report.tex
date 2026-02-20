@@ -1,0 +1,57 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{Feasibility Analysis: Making \$100/Month Trading Futures}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+The objective of this analysis is to determine the feasibility of consistently generating a \$100 monthly profit by trading futures contracts. We focus on Micro E-mini S\&P 500 (MES) contracts due to their lower capital requirements.
+
+\section{Formal Problem Definition}
+We define a trading strategy as a stochastic process where each trade has a win probability $p$, a reward-to-risk ratio $r$, and a risk amount $R$. The expected value $E$ of a single trade is:
+\begin{equation}
+E = p(rR - C) - (1-p)(R + C)
+\end{equation}
+where $C$ represents transaction costs (commissions and slippage).
+
+A monthly goal of \$100 requires a total expected profit $E_{total} \geq 100$ over $N$ trades:
+\begin{equation}
+N \times E \geq 100
+\end{equation}
+
+\section{Methodology}
+A Monte Carlo simulation was conducted with 10,000 iterations for each scenario. Each simulation modeled 20 trading days with 3 trades per day ($N=60$). We assumed a round-trip cost of \$1.50 per contract. Ruin was defined as a 20\% drawdown of the initial capital.
+
+\section{Simulation Results}
+The following table summarizes the probability of success (reaching +\$100) and the probability of ruin across various capital and risk configurations.
+
+\begin{center}
+\input{results_table.tex}
+\end{center}
+
+\section{Analysis}
+\begin{enumerate}
+    \item \textbf{Capital Constraints:} With small capital (\$500), achieving a \$100 profit (20\% return) requires high risk (5\% per trade), which leads to a significant probability of ruin (20\%).
+    \item \textbf{Risk Management:} At 1\% risk on \$1000 capital, the probability of reaching the target is low (19\%) because the expected profit is only \$15 over 60 trades.
+    \item \textbf{Edge Requirement:} A strategy with a 50\% win rate and 1.5:1 reward-to-risk ratio is statistically profitable, but its ability to reach a specific dollar target is heavily dependent on the trade frequency and capital allocation.
+    \item \textbf{Transaction Costs:} For micro contracts, commissions eat into a significant portion of the edge, especially for small targets.
+\end{enumerate}
+
+\section{Conclusion}
+It is mathematically possible to make \$100 a month trading futures, but it requires either:
+\begin{itemize}
+    \item High capital (e.g., \$5,000+) where \$100 is a modest 2\% monthly return, achievable with low risk.
+    \item High risk on small capital, which carries a substantial danger of total account loss.
+\end{itemize}
+For a sustainable approach, a minimum capital of \$2,000 is recommended to target \$100/month with reasonable risk.
+
+\end{document}

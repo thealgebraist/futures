@@ -1,0 +1,53 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\title{Comparative Generalization Analysis: PWL FFNN vs Gaussian Process}
+\author{Antigravity Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report compares the generalization capabilities of a 2-neuron Feed-Forward Neural Network (FFNN) with Piecewise Linear (PWL) activation functions ($M=2$) against a Gaussian Process (GP) regressor. Both models were evaluated using the same 4-test generalization suite after controlled training on 3 months of 10-minute futures data.
+
+\section{Methodology}
+\begin{itemize}
+    \item \textbf{PWL FFNN}: 16-input, 2nd-layer neurons, 2-piece PWL activation, trained for 4s.
+    \item \textbf{Gaussian Process}: RBF kernel, trained on 1000-point subset for 4s.
+\end{itemize}
+
+\section{Generalization Comparison}
+The MSE losses for both architectures across the benchmarks are summarized below:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Test Case & PWL FFNN (M=2) & Gaussian Process \\
+\midrule
+Hold-out & 5.38e-04 & 1.66e-04 \\
+Noise (0.1) & 9.51e-03 & 2.14e-02 \\
+Shift (0.5) & 0.243 & 0.248 \\
+Extrapolation (x2) & 1.081 & 1.428 \\
+\bottomrule
+\end{tabular}
+\caption{MSE Loss Comparison: High-dimensional futures prediction benchmarks.}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{gp_vs_pwl_comparison.png}
+\caption{Log-scale MSE loss comparison between PWL FFNN and Gaussian Process.}
+\end{figure}
+
+\section{Analysis and Conclusion}
+The Gaussian Process showed a clear advantage in the \textbf{Standard Hold-out} scenario, achieving an MSE roughly 3x lower than the PWL FFNN. This is likely due to the GP's ability to optimally interpolate in-distribution data points.
+
+However, the PWL FFNN demonstrated superior robustness in \textbf{Noise}, \textbf{Distribution Shift}, and \textbf{Extrapolation} scenarios. This suggests that the parametric structure of the FFNN provides a more rigid and potentially safer "inductive bias" when dealing with out-of-distribution or corrupted inputs compared to the non-parametric GP, which relies heavily on local kernel similarities.
+
+\end{document}

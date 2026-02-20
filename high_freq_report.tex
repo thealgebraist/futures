@@ -1,0 +1,56 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\title{High-Frequency Trading Analysis: 1-Minute BTCUSDT (4 Months)}
+\author{Antigravity Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+As requested, we reran the predictive analysis and trading simulations using 1-minute resolution data spanning 4 months. Due to data availability, Binance BTCUSDT was used as the high-resolution instrument.
+
+\section{Dataset Scaling}
+\begin{itemize}
+    \item \textbf{Total Steps}: 172,800 minutes (~4 months)
+    \item \textbf{Training Set}: 138,240 samples
+    \item \textbf{Test Set}: 34,560 samples (~28 days)
+    \item \textbf{Resolution}: 1 minute
+\end{itemize}
+
+\section{Model Performance}
+The 512-neuron FFNN was trained for 120 seconds. The training achieved an MSE of 0.0461. The higher MSE compared to 10-minute data reflects the increased entropy and volatility inherent in 1-minute price action.
+
+\section{Trading Simulation Results}
+The simulation was conducted over the final month of the dataset.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Metric & Bidirectional & Short-Only \\
+\midrule
+Initial Capital & \$100.00 & \$100.00 \\
+Final Equity & \$74.39 & \$98.69 \\
+Total Return & -25.61\% & -1.31\% \\
+Drawdown Profile & High & Moderate \\
+\bottomrule
+\end{tabular}
+\caption{1-Minute Strategy Performance Summary}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{performance_1min_4mo.png}
+\caption{Comparison of Bidirectional vs Short-Only returns at 1-minute resolution over 4 months.}
+\end{figure}
+
+\section{Conclusion}
+Scaling to high-frequency (1-minute) data significantly degrades the model's performance under the current architecture. The bidirectional strategy suffered from high variance and cumulative losses, while the short-only strategy remained more resilient but still failed to achieve profitability. This indicates that the 16-input 4-output structure may lack sufficient predictive horizon or filtering for high-frequency noise without further alpha refinement.
+
+\end{document}

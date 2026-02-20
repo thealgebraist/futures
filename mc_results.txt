@@ -1,0 +1,2 @@
+MC_Batches: 97504
+Final_Price_Mean: 6881.829513962992

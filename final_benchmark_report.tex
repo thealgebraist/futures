@@ -1,0 +1,52 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+\title{10-Year Growth Projections for Top Index Funds: Multi-Model Analysis}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Overview}
+This report provides 10-year projections for 8 major index funds using three distinct models: FFNN 256, Gaussian Process (GP), and Monte Carlo 64. Each model was trained for 5 minutes per asset on all available historical data.
+
+\section{Methodological Note: Autoregressive Divergence}
+Long-term price forecasting via iterative feedback (using predicted returns as future inputs) is inherently unstable. In this experiment, several models experienced exponential divergence (\textit{inf}) or collapse to zero. This is a common property of non-linear dynamical systems where small estimation errors compound over 2,520 trading steps.
+
+\section{Projected Value of \$100 (Year 10)}
+The following table shows the projected value of a \$100 investment at the 10-year horizon for assets where at least one model produced stable results.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Index & FFNN 256 (\$) & GP (\$) & MC 64 (\$) \\
+\midrule
+DIA (Dow) & 354.85 & 263.85 & \textit{Div.} \\
+VTI (Total) & \textit{Div.} & 275.01 & \textit{Div.} \\
+VXUS (Intl) & 124.11 & 0.01 & 0.00 \\
+BND (Bonds) & 103.77 & 25,620.14 & \textit{Div.} \\
+QQQ (Nasdaq) & 0.00 & 68.44 & \textit{Div.} \\
+VIG (Div.) & 0.00 & 13,093.98 & 3.08 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\textit{Div. = Diverged (inf or astronomical values)}
+
+\section{Comparative Analysis}
+\begin{itemize}
+    \item \textbf{FFNN 256:} For the Dow Jones (DIA), the FFNN predicted a growth to \$354.85, a reasonable long-term outcome. However, for growth-heavy indices like QQQ and IWM, the high capacity of the network likely amplified small negative biases or variance, leading to collapse.
+    \item \textbf{Gaussian Process:} The GP remained remarkably stable for large-cap indices (DIA, VTI), projecting \$263-\$275. For the bond market (BND), the GP likely overfitted to a specific historical trend, leading to an unrealistic \$25k projection.
+    \item \textbf{Monte Carlo 64:} The stochastic nature of the MC search proved highly susceptible to divergence in an iterative context, with almost all simulations reaching extreme values.
+\end{itemize}
+
+\section{Conclusion}
+The experiment confirms that the **Gaussian Process** provides the most physically plausible long-term projections for stable equity indices like DIA and VTI. Neural networks, while powerful for short-term alpha, require significant architectural constraints (e.g., drift regularizers) to be used for multi-year iterative forecasting.
+
+\end{document}

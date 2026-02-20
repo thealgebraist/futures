@@ -1,0 +1,2 @@
+Final_Capital: 0
+History: [np.float64(38.75), np.float64(37.25), np.float64(38.25), np.float64(38.0), np.float64(36.5), np.float64(26.25), np.float64(2.25), np.float64(24.5), np.float64(9.25), np.float64(11.5), np.float64(6.25), np.float64(12.25), np.float64(4.5), np.float64(3.0), np.float64(9.0), np.float64(11.25), np.float64(2.25), np.float64(2.0), np.float64(9.25), np.float64(-4.75)]

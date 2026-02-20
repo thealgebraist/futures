@@ -1,0 +1,46 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{Walk-Forward Profit Analysis: 8-Iteration Simulation}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Methodology}
+The analysis employed an 8-iteration walk-forward validation scheme. The test month was divided into 8 sequential folds. In each iteration, the Discontinuous PWL-FFNN ($N=128$) was retrained on all historical data and then simulated on the unseen fold. Starting capital was \$100.00.
+
+\section{Results}
+The simulation encountered immediate catastrophic failure in the first iteration.
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Starting Capital & \$100.00 \\
+Iteration 0 PnL & -\$966.16 \\
+Final Capital & \$0.00 \\
+Status & \textbf{Account Liquidated} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Critical Analysis}
+The rapid liquidation of the \$100 account highlights the extreme leverage and risk inherent in futures trading:
+\begin{enumerate}
+    \item \textbf{Margin vs. PnL:} A \$100 account is insufficient to withstand even a small correction in Micro ES futures. The simulation shows a loss of nearly \$1,000 in the first few days of the test set, which would have triggered immediate broker liquidation.
+    \item \textbf{Model Bias:} The PWL-FFNN, while exhibiting low training error, likely failed to capture a sharp regime shift at the start of the walk-forward period, leading to incorrect directional bets.
+    \item \textbf{Transaction Cost Erosion:} The cumulative impact of \$1.50 per trade on a high-frequency (10-min) signal is lethal for a sub-\$1,000 account.
+\end{enumerate}
+
+\section{Conclusion}
+The 8-iteration walk-forward test confirms that while high-capacity models like the PWL-FFNN can fit historical data well, the combination of high-frequency noise and low starting capital makes futures trading statistically unsustainable for a \$100 account. A minimum capitalization of \$5,000+ is recommended to survive the volatility observed in the walk-forward period.
+
+\end{document}

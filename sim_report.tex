@@ -1,0 +1,61 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{High-Capacity LSTM Analysis: 8 Futures and \$100 Simulation}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report evaluates a high-capacity LSTM model (512 neurons, 2 layers) trained on 8 futures symbols (ES, NQ, RTY, CL, GC, MES, MNQ, M2K). A trading simulation was performed on an unseen out-of-sample test set (last 20\% of the 60-day 10-min data) to assess the feasibility of starting with a \$100 account.
+
+\section{Model and Data}
+\begin{itemize}
+    \item \textbf{Architecture:} 2-layer LSTM with 512 hidden units.
+    \item \textbf{Input Features:} 8 futures (E-mini and Micro contracts).
+    \item \textbf{Target:} Micro E-mini S\&P 500 (MES) next 10-min price.
+    \item \textbf{Training duration:} 120 seconds.
+\end{itemize}
+
+\section{Simulation Parameters}
+\begin{itemize}
+    \item \textbf{Initial Capital:} \$100.00
+    \item \textbf{Asset:} MES (Micro E-mini S\&P 500).
+    \item \textbf{Contract Multiplier:} \$5.00 per point.
+    \item \textbf{Commissions:} \$1.50 per round-trip trade.
+    \item \textbf{Strategy:} Directional prediction (Long if $Pred_{t+1} > Price_t$, Short otherwise).
+\end{itemize}
+
+\section{Results}
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Initial Capital & \$100.00 \\
+Final Capital (Out-of-Sample) & \$0.00 \\
+Net Profit/Loss & -\$100.00 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Analysis}
+The simulation resulted in a total loss of the initial \$100 capital. Several factors contribute to this outcome:
+\begin{enumerate}
+    \item \textbf{Undercapitalization:} A \$100 account provides no buffer for drawdowns. In futures trading, even Micro contracts (MES) move significantly. A 20-point move against the position results in a \$100 loss, which is 100\% of the account.
+    \item \textbf{Transaction Costs:} At \$1.50 per 10-minute trade, commissions rapidly erode a small account. Over many trades, this fixed cost creates a significant hurdle for profitability.
+    \item \textbf{Model Accuracy:} While a 512-neuron LSTM is a powerful architecture, directional prediction of high-frequency futures prices is notoriously difficult and susceptible to noise.
+    \item \textbf{Margin Requirements:} In a real-world scenario, a broker would likely liquidate the position long before the account reaches zero due to maintenance margin requirements.
+\end{enumerate}
+
+\section{Conclusion}
+Starting with \$100 to trade futures, even with a sophisticated 512-neuron LSTM model, is extremely high risk and statistically likely to result in total capital loss. A much larger capital base (at least \$2,000-\$5,000) is required to withstand the inherent volatility and transaction costs of the futures market.
+
+\end{document}

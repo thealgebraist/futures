@@ -1,0 +1,49 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\title{DIA Reanalysis: Impact of Architecture and Training Duration}
+\author{Gemini CLI Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report provides a comparative reanalysis of the Dow Jones Industrial Average (DIA) index fund using three different neural network architectures. We aim to determine how increasing the computational budget (training time) and model complexity affects long-term autoregressive stability.
+
+\section{Methodology}
+\begin{enumerate}
+    \item \textbf{FFNN 256 (5min):} Single hidden layer, trained for 300 seconds.
+    \item \textbf{FFNN 512 (10min):} Single hidden layer, trained for 600 seconds.
+    \item \textbf{FFNN 64-64 (10min):} Two hidden layers, trained for 600 seconds.
+\end{enumerate}
+
+\section{10-Year Growth Projection (\$100 base)}
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Architecture & Projected Value (\$) \\
+\midrule
+FFNN 256 (5min) & 354.85 \\
+FFNN 512 (10min) & 0.00 \\
+FFNN 64-64 (10min) & 41.35 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Technical Analysis}
+\begin{itemize}
+    \item \textbf{High-Capacity Instability:} The FFNN 512 model, despite having the largest capacity and training time, collapsed to zero. This confirms that without explicit constraints, larger networks are more prone to learning negative biases that compound exponentially in multi-year feedback loops.
+    \item \textbf{Deep vs. Shallow:} The two-layer (64-64) model provided a more conservative but non-zero projection (\$41.35). This suggests that deeper architectures may provide slightly better structural regularization for time-series, although they still underperform the shallow 256-neuron model in this specific unconstrained setup.
+    \item \textbf{Training Budget Paradox:} More training time (10min vs 5min) did not necessarily lead to more plausible long-term results, as the model likely overfitted to localized historical noise.
+\end{itemize}
+
+\section{Conclusion}
+For long-term autoregressive forecasting of indices, the **FFNN 256 (5min)** model remains the most stable configuration discovered in this experiment. Larger or deeper unconstrained models tend to exacerbate the compounding errors inherent in iterative price projection.
+
+\end{document}

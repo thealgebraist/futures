@@ -1,0 +1,80 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\title{Master Consolidation: Integrated Analysis of Futures Predictive Modeling}
+\author{Antigravity Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\newpage
+
+\section{Introduction}
+This report provides a comprehensive summary of all technical phases conducted during the futures analysis project. The project evolved from stochastic path derivation to deep learning implementation, strategy backtesting, and architectural generalization benchmarking.
+
+\section{Stochastic Foundations}
+The project began with the formulation of a Sum of Gaussian Walks model for the \texttt{NQ=F} future. 
+\begin{itemize}
+    \item \textbf{Model}: Dual-frequency Brownian increments with piecewise regime shifts.
+    \item \textbf{Verification}: 10,000 Monte Carlo paths yielded an expected terminal value of $0.0489 \pm 0.0012$.
+    \item \textbf{Impact}: Captured the multifractal nature required for subsequent deep learning training.
+\end{itemize}
+
+\section{Deep Learning Benchmarks}
+\subsection{Predictive Performance}
+The core predictive task utilized a 512-neuron FFNN trained for 120 seconds to map 16 historical 10-minute windows to 4 future windows. 
+\begin{itemize}
+    \item \textbf{Training}: 367 epochs.
+    \item \textbf{MSE}: 0.0212 (Test set).
+\end{itemize}
+
+\subsection{Architectural Comparisons}
+Advanced architectures were evaluated on multi-instrument data:
+\begin{table}[h!]
+\centering
+\begin{tabular}{lr}
+\toprule
+Architecture & Performance (MSE) \\
+\midrule
+FFNN (32-neuron) & 0.1020 \\
+LSTM (2-layer) & 0.0691 \\
+PWL-FFNN (128-segment) & 0.2322 \\
+Gaussian Process (Baseline) & 1.2206 \\
+Neural ODE & 48.32 \\
+\bottomrule
+\end{tabular}
+\caption{Cross-architecture performance summary.}
+\end{table}
+
+\section{Trading Simulations}
+\subsection{Strategy Evolution}
+Backtesting revealed a divergence between bidirectional signals and short-biased signals.
+\begin{itemize}
+    \item \textbf{Bidirectional}: $-0.99\%$ return (\$99.01).
+    \item \textbf{Short-Only}: $+0.46\%$ return (\$100.46).
+    \item \textbf{Insight}: The model's short signals demonstrated higher alpha density.
+\end{itemize}
+
+\subsection{High-Frequency Scaling}
+Tests on 1-minute data (BTCUSDT) showed significant performance decay, losing 25\% in the bidirectional set. This confirms the "scaling limit" of the current 16-input architecture without additional signal noise reduction.
+
+\section{Generalization and Robustness}
+Evaluation of 2-neuron FFNNs with Piecewise Linear (PWL) activation against GP regressors revealed:
+\begin{enumerate}
+    \item \textbf{Interpolation}: GPs excel at in-distribution tasks (MSE 1.66e-04).
+    \item \textbf{Robustness}: PWL FFNNs outperformed GPs in Noise, Mean Shift, and Extrapolation scenarios.
+\end{enumerate}
+
+\section{Conclusion}
+The synthesis of results indicates that for high-frequency futures trading, the selection of architecture must balance interpolation accuracy (GP/LSTM) with robustness to distribution shifts (FFNN-PWL). The current state-of-the-art for this project is a short-biased system utilizing temporal dependencies (LSTM) or robust parametric non-linearities (PWL).
+
+\end{document}

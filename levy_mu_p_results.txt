@@ -1,0 +1,4 @@
+AAPL Final_Val_MSE: 0.616711
+MSFT Final_Val_MSE: 51820.3
+NVDA Final_Val_MSE: 37596.4
+GOOGL Final_Val_MSE: 0.708991

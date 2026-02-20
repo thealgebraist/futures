@@ -1,0 +1,62 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\title{Generalization Analysis: 2-Neuron PWL FFNNs}
+\author{Antigravity Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report analyzes the generalization characteristics of a minimal 2-neuron Feed-Forward Neural Network (FFNN) using $M$-piece Linear Piecewise (PWL) activation functions. The models were trained for 4 seconds on 3 months of 10-minute futures data (NQ=F proxy).
+
+\section{Experimental Setup}
+\begin{itemize}
+    \item \textbf{Architecture}: 16 inputs $\to$ 2 neurons $\to$ PWL Activation $\to$ 1 output.
+    \item \textbf{Activation}: Piecewise Linear with $M \in \{2, 4, 8, 16\}$ pieces.
+    \item \textbf{Optimizer}: R-Adam, lr=1e-3.
+    \item \textbf{Training Duration}: 4 seconds per configuration.
+\end{itemize}
+
+\section{Generalization Tests}
+Four tests were performed to evaluate robustness:
+\begin{enumerate}
+    \item \textbf{Test 1 (Hold-out)}: Standard unseen test set evaluation.
+    \item \textbf{Test 2 (Noise)}: Input data perturbed with $\mathcal{N}(0, 0.1^2)$ Gaussian noise.
+    \item \textbf{Test 3 (Shift)}: Input data mean-shifted by $+0.5$ standard deviations.
+    \item \textbf{Test 4 (Extrapolation)}: Input data scaled by $2.0$ to test out-of-distribution behavior.
+\end{enumerate}
+
+\section{Results}
+The MSE losses for different $M$ values are summarized below:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+$M$ & Hold-out & Noise (0.1) & Shift (0.5) & Extrap (x2) \\
+\midrule
+2 & 5.38e-04 & 9.51e-03 & 0.243 & 1.081 \\
+4 & 9.37e-04 & 8.72e-03 & 0.243 & 1.132 \\
+8 & 1.18e-03 & 6.71e-03 & 0.248 & 1.464 \\
+16 & 3.73e-03 & 5.87e-03 & 0.256 & 1.348 \\
+\bottomrule
+\end{tabular}
+\caption{MSE Loss across generalization benchmarks.}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{pwl_generalization_results.png}
+\caption{Log-scale MSE loss vs number of PWL pieces.}
+\end{figure}
+
+\section{Conclusion}
+The minimal 2-neuron architecture demonstrates that while increasing PWL complexity ($M$) can marginally improve noise resilience in some regimes, it tends to increase hold-out error (potential overfitting to the short training burst) and remains highly sensitive to mean shifts and extrapolation. Lower $M$ values (e.g., $M=2$, which resembles a leaky ReLU variant) provide the best balance for standard hold-out generalization under extremely short training constraints.
+
+\end{document}

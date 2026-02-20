@@ -1,0 +1,49 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\title{Trading Strategy Backtest: Monthly FFNN Simulation}
+\author{Antigravity Agent}
+\date{February 18, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Methodology}
+The backtest utilized a 512-neuron FFNN model trained to predict the next 4 10-minute price windows. The simulation started with an initial capital of \$100 and executed a "long/short" strategy based on the model's predicted future average price relative to the current spot price.
+
+\section{Formal Basis}
+The portfolio accumulation logic was formalized in Coq, ensuring that $V_{t+1} = V_t(1 + r_t p_t)$ and verifying the non-negativity of the portfolio value under controlled leverage and returns.
+
+\section{Simulation Results}
+The simulation was conducted over a test set comprising 2074 steps (approximately 14.4 trading days).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Initial Capital & \$100.00 \\
+Final Portfolio Value & \$99.01 \\
+Total Return & -0.99\% \\
+Number of Trades/Steps & 2074 \\
+Trading Frequency & 10-minute intervals \\
+\bottomrule
+\end{tabular}
+\caption{Backtest Performance Summary}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{equity_curve.png}
+\caption{Equity curve and corresponding model positions (1:Long, -1:Short, 0:Cash).}
+\end{figure}
+
+\section{Discussion}
+The strategy resulted in a marginal loss of \$0.99 over the simulation period. This drawdown corresponds to the baseline "no-edge" or slightly negative drift observed in the specific test window of the NQ=F future. Further refinement of the signal threshold or inclusion of transaction costs/slippage (not modeled here) would be necessary for a production-ready system.
+
+\end{document}
