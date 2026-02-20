@@ -96,8 +96,8 @@ __device__ __forceinline__ void add_mod_ptx(uint64_t* a, const uint64_t* b) {
         "addc.cc.u64 %3, %3, %9;\n\t"
         "addc.cc.u64 %4, %4, %10;\n\t"
         "addc.u64 %5, %5, %11;\n\t"
-        : "+l"(a.limbs[0]), "+l"(a.limbs[1]), "+l"(a.limbs[2]), "+l"(a.limbs[3]), "+l"(a.limbs[4]), "+l"(a.limbs[5])
-        : "l"(b.limbs[0]), "l"(b.limbs[1]), "l"(b.limbs[2]), "l"(b.limbs[3]), "l"(b.limbs[4]), "l"(b.limbs[5])
+        : "+l"(a[0]), "+l"(a[1]), "+l"(a[2]), "+l"(a[3]), "+l"(a[4]), "+l"(a[5])
+        : "l"(b[0]), "l"(b[1]), "l"(b[2]), "l"(b[3]), "l"(b[4]), "l"(b[5])
     );
 }
 __global__ void gpu_miner_kernel(uint64_t start, uint64_t target, uint64_t* d_win_nonce, int* d_found) {
