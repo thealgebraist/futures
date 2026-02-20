@@ -19,7 +19,7 @@
 #endif
 
 /**
- * PRODUCTION MONSTER MINER (v55 - FULL UI RESTORATION)
+ * PRODUCTION MONSTER MINER (v56 - BULLETPROOF STABILITY)
  */
 
 struct MinerState {
@@ -37,17 +37,29 @@ struct MinerState {
     char pool_url[128] = "aleo-asia.f2pool.com";
     int pool_port = 4420;
     std::atomic<uint64_t> current_target{0x000000000FFFFFFFULL};
-    char current_job[128] = "job_init";
+    char current_job[128] = "job_v56";
 };
 
-// ------------------------------------------------------------------
-// NETWORK ENGINE
-// ------------------------------------------------------------------
+void cleanup_connection(MinerState* state) {
+    state->connected = false;
+    state->authorized = false;
+    if (state->ssl_handle) {
+        SSL_shutdown(state->ssl_handle);
+        SSL_free(state->ssl_handle);
+        state->ssl_handle = nullptr;
+    }
+    if (state->socket_fd != -1) {
+        close(state->socket_fd);
+        state->socket_fd = -1;
+    }
+}
+
 bool connect_ssl(MinerState* state) {
+    cleanup_connection(state); // Ensure old resources are freed
     struct hostent* host = gethostbyname(state->pool_url);
     struct sockaddr_in serv{}; serv.sin_family = AF_INET; serv.sin_port = htons(state->pool_port);
     if (host) memcpy(&serv.sin_addr, host->h_addr, host->h_length);
-    else inet_pton(AF_INET, "172.65.186.4", &serv.sin_addr); // Verified F2Pool IP
+    else inet_pton(AF_INET, "172.65.186.4", &serv.sin_addr);
 
     state->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     struct timeval tv; tv.tv_sec = 5; tv.tv_usec = 0;
@@ -66,8 +78,8 @@ void stratum_listener(MinerState* state) {
         int r = SSL_read(state->ssl_handle, buf, 16383);
         if (r <= 0) break;
         buf[r] = '\0';
-        if (strstr(buf, "\"result\":true") || strstr(buf, "null")) {
-            if (strstr(buf, "\"id\":2") || strstr(buf, "authorize")) state->authorized = true;
+        if (strstr(buf, "\"result\":true") || strstr(buf, "null") || strstr(buf, "true")) {
+            if (strstr(buf, "authorize") || strstr(buf, "\"id\":2")) state->authorized = true;
             else if (strstr(buf, "submit") || strstr(buf, "\"id\":4")) state->shares++;
         }
         if (char* notify = strstr(buf, "mining.notify")) {
@@ -78,9 +90,6 @@ void stratum_listener(MinerState* state) {
     state->connected = false;
 }
 
-// ------------------------------------------------------------------
-// GPU ENGINE (24GB SoA)
-// ------------------------------------------------------------------
 #ifdef __CUDACC__
 __device__ __forceinline__ void add_mod_ptx_soa(uint64_t* limbs, uint64_t* step, int idx, size_t stride) {
     asm volatile("add.cc.u64 %0, %0, %6;\n\taddc.cc.u64 %1, %1, %7;\n\taddc.cc.u64 %2, %2, %8;\n\t"
@@ -102,16 +111,12 @@ __global__ void gpu_monster_kernel(uint64_t* soa_grid, size_t offset, size_t str
 
 void run_miner(MinerState* state) {
     SSL_library_init(); state->ssl_ctx = SSL_CTX_new(TLS_client_method());
-    std::printf("\033[1;34m[INIT]\033[0m Initializing SSL Stack... OK\n");
-
+    
 #ifdef __CUDACC__
     size_t num_nonces = 500000000; 
     uint64_t* d_soa_grid;
-    std::printf("\033[1;34m[INIT]\033[0m Requesting 24GB Blackwell VRAM... "); std::fflush(stdout);
     CHECK_CUDA(cudaMalloc(&d_soa_grid, num_nonces * 6 * sizeof(uint64_t)));
     CHECK_CUDA(cudaMemset(d_soa_grid, 0, num_nonces * 6 * sizeof(uint64_t)));
-    std::printf("\033[1;32mDONE\033[0m\n");
-
     uint64_t* d_win; int* d_found;
     cudaMalloc(&d_win, sizeof(uint64_t)); cudaMalloc(&d_found, sizeof(int));
     cudaStream_t stream; cudaStreamCreate(&stream);
@@ -126,14 +131,14 @@ void run_miner(MinerState* state) {
             uint64_t curr_h = state->total_hashes.load();
             double speed = (curr_h - last_h) / dt / 1e6;
             last_h = curr_h; last_t = now;
-            std::printf("\r\033[2K\033[1;37m[5090]\033[0m \033[1;32m%7.2f Mh/s\033[0m | \033[1;33mAcc: %llu\033[0m | \033[1;34mAuth: %s\033[0m", speed, state->shares.load(), state->authorized ? "OK":"WAIT");
+            std::printf("\r\033[2K\033[1;37m[5090]\033[0m \033[1;32m%7.2f Mh/s\033[0m | \033[1;33mAcc: %llu\033[0m | \033[1;34mConn: %s\033[0m", 
+                        speed, state->shares.load(), state->connected ? "OK":"RECONNECT");
             std::fflush(stdout);
         }
     });
 
     while (!state->stop_flag) {
         if (!state->connected) {
-            std::printf("\033[1;34m[NET]\033[0m Connecting to %s...\n", state->pool_url);
             if (connect_ssl(state)) {
                 state->connected = true;
                 std::thread(stratum_listener, state).detach();
@@ -162,15 +167,13 @@ void run_miner(MinerState* state) {
         }
 #endif
     }
+    telemetry_thread.join();
 }
 
 int main(int argc, char** argv) {
     MinerState state;
     strcpy(state.address, "anders2026.5090");
     for (int i = 1; i < argc; ++i) if (strcmp(argv[i], "--address") == 0 && i+1 < argc) strcpy(state.address, argv[++i]);
-    std::printf("=================================================\n");
-    std::printf("   PRODUCTION MONSTER MINER (v55 - LIVE)         \n");
-    std::printf("=================================================\n");
     run_miner(&state);
     return 0;
 }
