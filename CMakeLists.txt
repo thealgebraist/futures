@@ -4,7 +4,8 @@ project(AleoOptimizedMiner LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 1. OpenSSL Discovery
+# 1. Dependency Discovery
+find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 message(STATUS "OpenSSL Found: ${OPENSSL_VERSION}")
 
@@ -27,14 +28,26 @@ if(CMAKE_CUDA_COMPILER)
     set(CMAKE_CUDA_STANDARD 20)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     
-    # Hybrid GPU Miner (v18+)
+    # Hybrid GPU Miner (v20)
     add_executable(hybrid_5090_miner hybrid_5090_miner.cu)
-    target_link_libraries(hybrid_5090_miner PRIVATE OpenSSL::SSL OpenSSL::Crypto threads)
+    target_link_libraries(hybrid_5090_miner PRIVATE OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
 endif()
 
 # 4. CPU Targets
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    # Master M2 Prover
     add_executable(master_m2_prover master_m2_prover.cpp)
+    
+    # Production Stratum Miner
     add_executable(production_prover_v2 production_prover_v2.cpp)
-    target_link_libraries(production_prover_v2 PRIVATE OpenSSL::SSL OpenSSL::Crypto threads)
+    target_link_libraries(production_prover_v2 PRIVATE OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+
+    # Real Proof Submitter
+    add_executable(real_proof_submitter real_proof_submitter.cpp)
+    target_link_libraries(real_proof_submitter PRIVATE OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+endif()
+
+# 5. Installation
+if(TARGET master_m2_prover)
+    install(TARGETS master_m2_prover production_prover_v2 DESTINATION bin)
 endif()
