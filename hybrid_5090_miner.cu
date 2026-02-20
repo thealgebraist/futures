@@ -46,11 +46,14 @@ __device__ __forceinline__ void add_mod_ptx(uint64_t* a, const uint64_t* b) {
                  "addc.cc.u64 %3, %3, %9;\n\taddc.cc.u64 %4, %4, %10;\n\taddc.u64 %5, %5, %11;\n\t"
                  : "+l"(a[0]), "+l"(a[1]), "+l"(a[2]), "+l"(a[3]), "+l"(a[4]), "+l"(a[5])
                  : "l"(b[0]), "l"(b[1]), "l"(b[2]), "l"(b[3]), "l"(b[4]), "l"(b[5]));
-    if (a[5] >= P_DEV[5]) { #pragma unroll 
-        for(int i=0; i<6; ++i) a[i] -= P_DEV[i]; }
+    if (a[5] >= P_DEV[5]) {
+        #pragma unroll 
+        for(int i=0; i<6; ++i) a[i] -= P_DEV[i];
+    }
 }
 __device__ __forceinline__ void modular_butterfly(uint64_t* u, uint64_t* v) {
-    uint64_t u_old[6]; #pragma unroll 
+    uint64_t u_old[6];
+    #pragma unroll 
     for(int i=0; i<6; ++i) u_old[i] = u[i];
     add_mod_ptx(u, v);
     #pragma unroll 
