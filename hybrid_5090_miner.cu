@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
             int found = 0; cudaMemcpy(&found, d_found, sizeof(int), cudaMemcpyDeviceToHost);
             if (found) {
                 uint64_t w; cudaMemcpy(&w, d_win, sizeof(uint64_t), cudaMemcpyDeviceToHost);
-                submit_proof(state.address, w); state->shares++;
+                submit_proof(state.address, w); state.shares++;
             }
             base += (16384 * 256); state.hashes.fetch_add(16384 * 256);
         }
