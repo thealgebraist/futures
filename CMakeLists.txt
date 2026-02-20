@@ -34,16 +34,20 @@ if(CMAKE_CUDA_COMPILER)
 endif()
 
 # 3. CPU Targets
-# Master M2 Prover
-add_executable(master_m2_prover master_m2_prover.cpp)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    # Master M2 Prover (ARM Only)
+    add_executable(master_m2_prover master_m2_prover.cpp)
+    
+    # Production Stratum Miner (ARM Version)
+    add_executable(production_prover_v2 production_prover_v2.cpp)
+    target_link_libraries(production_prover_v2 PRIVATE threads)
 
-# Production Stratum Miner
-add_executable(production_prover_v2 production_prover_v2.cpp)
-target_link_libraries(production_prover_v2 PRIVATE threads)
-
-# Real Proof Submitter
-add_executable(real_proof_submitter real_proof_submitter.cpp)
-target_link_libraries(real_proof_submitter PRIVATE threads)
+    # Real Proof Submitter (ARM Version)
+    add_executable(real_proof_submitter real_proof_submitter.cpp)
+    target_link_libraries(real_proof_submitter PRIVATE threads)
+endif()
 
 # 4. Installation
-install(TARGETS master_m2_prover production_prover_v2 DESTINATION bin)
+if(TARGET master_m2_prover)
+    install(TARGETS master_m2_prover production_prover_v2 DESTINATION bin)
+endif()
