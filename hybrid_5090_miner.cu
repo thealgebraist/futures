@@ -29,7 +29,7 @@
 #endif
 
 /**
- * PRODUCTION HYBRID MINER (v11 - AUTO-POOL CYCLING)
+ * PRODUCTION HYBRID MINER (v12 - INSTANT CONNECT / NO BUFFER)
  */
 
 struct MinerState {
@@ -55,13 +55,7 @@ PoolConfig POOLS[] = {
 };
 
 bool resolve_hostname(const char* hostname, int port, struct sockaddr_in* addr) {
-    struct hostent* host = gethostbyname(hostname);
-    if (host) {
-        addr->sin_family = AF_INET;
-        addr->sin_port = htons(port);
-        addr->sin_addr.s_addr = *((unsigned long*)host->h_addr);
-        return true;
-    }
+    // 1. FAST PATH: Hardcoded IPs to bypass DNS hangs
     const char* fallback_ip = nullptr;
     if (strstr(hostname, "apool.io") && strstr(hostname, ".hk")) fallback_ip = "172.65.162.169";
     else if (strstr(hostname, "apool.io") && strstr(hostname, ".us")) fallback_ip = "172.65.230.151";
@@ -72,6 +66,14 @@ bool resolve_hostname(const char* hostname, int port, struct sockaddr_in* addr) 
     if (fallback_ip) {
         addr->sin_family = AF_INET; addr->sin_port = htons(port);
         inet_pton(AF_INET, fallback_ip, &addr->sin_addr);
+        return true;
+    }
+
+    // 2. SLOW PATH: Only try DNS if not in fallback table
+    struct hostent* host = gethostbyname(hostname);
+    if (host) {
+        addr->sin_family = AF_INET; addr->sin_port = htons(port);
+        addr->sin_addr.s_addr = *((unsigned long*)host->h_addr);
         return true;
     }
     return false;
@@ -110,7 +112,7 @@ void stratum_listener(MinerState* state) {
             if (strstr(buf, "\"id\":1")) state->authorized = true;
             else if (strstr(buf, "\"id\":4")) state->shares++;
         } else if (strstr(buf, "mining.notify")) {
-            strcpy(state->current_job, "job_v11");
+            strcpy(state->current_job, "job_v12");
         }
     }
 }
@@ -119,7 +121,7 @@ bool check_pool_connectivity(const char* url, int port, const char* addr) {
     struct sockaddr_in serv{};
     if (!resolve_hostname(url, port, &serv)) return false;
     int fd = socket(AF_INET, SOCK_STREAM, 0);
-    struct timeval tv; tv.tv_sec = 3; tv.tv_usec = 0;
+    struct timeval tv; tv.tv_sec = 2; tv.tv_usec = 0; // Fast timeout
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
     if (connect(fd, (struct sockaddr*)&serv, sizeof(serv)) < 0) { close(fd); return false; }
     char auth[512]; snprintf(auth, 512, "{\"id\":1,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", addr);
@@ -133,13 +135,15 @@ bool check_pool_connectivity(const char* url, int port, const char* addr) {
 void run_miner(MinerState* state) {
     bool connected = false;
     for (auto& p : POOLS) {
-        std::printf("[SYS] Checking Pool: %s:%d\n", p.url, p.port);
+        std::printf("[SYS] Auditing Pool: %s:%d... ", p.url, p.port); std::fflush(stdout);
         if (check_pool_connectivity(p.url, p.port, state->address)) {
             strcpy(state->pool_url, p.url); state->pool_port = p.port;
+            std::printf("\033[1;32mONLINE\033[0m\n"); std::fflush(stdout);
             connected = true; break;
         }
+        std::printf("\033[1;31mFAILED\033[0m\n"); std::fflush(stdout);
     }
-    if (!connected) { std::printf("[FATAL] All pools rejected connection.\n"); return; }
+    if (!connected) { std::printf("[FATAL] All pools unreachable. Check server internet.\n"); return; }
 
     struct sockaddr_in serv{}; resolve_hostname(state->pool_url, state->pool_port, &serv);
     state->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -170,10 +174,11 @@ void run_miner(MinerState* state) {
     });
 #endif
 
-    std::printf("\033[1;32m[NET]\033[0m Mining on %s...\n", state->pool_url);
+    std::printf("\033[1;32m[NET]\033[0m Mining active on %s\n", state->pool_url); std::fflush(stdout);
     while(!state->stop_flag) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        std::printf("\r[MINER] Speed: %.2f Mh/s | Accepted: %llu", state->hashes.exchange(0)/1e6, state->shares.load());
+        double speed = state->hashes.exchange(0) / 1e6;
+        std::printf("\r[MINER] Speed: %.2f Mh/s | Accepted: %llu", speed, state->shares.load());
         std::fflush(stdout);
     }
 }
@@ -182,11 +187,16 @@ int main(int argc, char** argv) {
     MinerState state;
     strcpy(state.address, "aleo1wss37wdffev2ezdz4e48hq3yk9k2xenzzhweeh3rse7qm8rkqc8s4vp8v3.worker_5090");
     for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--address") == 0 && i + 1 < argc) strcpy(state.address, argv[++i]);
+        if (strcmp(argv[i], "--address") == 0 && i + 1 < argc) {
+            strcpy(state.address, argv[++i]);
+            if (!strchr(state.address, '.')) strcat(state.address, ".worker_5090");
+        }
     }
     std::printf("=================================================\n");
-    std::printf("   PRODUCTION HYBRID MINER (v11 - AUTO-FAILOVER) \n");
-    std::printf("=================================================\n\n");
+    std::printf("   PRODUCTION HYBRID MINER (v12 - NO BUFFER)     \n");
+    std::printf("   Address: %s\n", state.address);
+    std::printf("=================================================\n");
+    std::fflush(stdout);
     run_miner(&state);
     return 0;
 }
