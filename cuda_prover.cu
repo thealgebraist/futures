@@ -14,12 +14,12 @@
  * - Multi-Scalar Multiplication (MSM) and Radix-2 NTT placeholders.
  */
 
-#define CHECK_CUDA(call) { 
-    cudaError_t err = call; 
-    if(err != cudaSuccess) { 
-        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << " at " << __FILE__ << ":" << __LINE__ << std::endl; 
-        exit(1); 
-    } 
+#define CHECK_CUDA(call) { \
+    cudaError_t err = call; \
+    if(err != cudaSuccess) { \
+        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        exit(1); \
+    } \
 }
 
 // ------------------------------------------------------------------
@@ -47,7 +47,6 @@ __device__ void add_mod_device(Fp377& a, const Fp377& b) {
         a.limbs[i] = (uint64_t)sum;
         carry = sum >> 64;
     }
-    // Note: Production code checks if a >= P_DEV and subtracts P_DEV here.
 }
 
 /**
@@ -57,13 +56,11 @@ __global__ void nonce_grind_kernel(uint64_t start_nonce, uint64_t target, uint64
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     uint64_t my_nonce = start_nonce + idx;
     
-    // Simulate hashing math utilizing BLS12-377 structs (Poseidon/Blake3 usually mapped to field elements)
     Fp377 hash_val = {{my_nonce, my_nonce ^ 0x9E3779B97F4A7C15, 0, 0, 0, 0}};
     Fp377 step_val = {{2, 3, 5, 7, 11, 13}};
     
     add_mod_device(hash_val, step_val);
     
-    // Simple mock target check for the kernel
     if (hash_val.limbs[0] < target) {
         if (atomicExch(d_found, 1) == 0) {
             *d_winning_nonce = my_nonce;
@@ -75,15 +72,12 @@ __global__ void nonce_grind_kernel(uint64_t start_nonce, uint64_t target, uint64
 // 2. BENCHMARKING FRAMEWORK
 // ------------------------------------------------------------------
 void run_benchmark() {
-    std::cout << "=================================================
-";
-    std::cout << "  CUDA BLS12-377 BENCHMARK (RTX 5090 PROFILING)  
-";
-    std::cout << "=================================================
-";
+    std::cout << "=================================================\n";
+    std::cout << "  CUDA BLS12-377 BENCHMARK (RTX 5090 PROFILING)  \n";
+    std::cout << "=================================================\n";
 
     int threads_per_block = 256;
-    int blocks = 8192; // Massively saturate the RTX 5090 SMs
+    int blocks = 8192; 
     uint64_t total_hashes = (uint64_t)blocks * threads_per_block;
 
     uint64_t* d_winning_nonce;
@@ -92,17 +86,13 @@ void run_benchmark() {
     CHECK_CUDA(cudaMalloc(&d_found, sizeof(int)));
     CHECK_CUDA(cudaMemset(d_found, 0, sizeof(int)));
 
-    // Target set to 0 to prevent early exit in benchmark, we just want to measure throughput
     uint64_t impossible_target = 0; 
 
-    std::cout << "[BENCH] Launching " << blocks << " blocks of " << threads_per_block << " threads...
-";
+    std::cout << "[BENCH] Launching " << blocks << " blocks of " << threads_per_block << " threads...\n";
 
-    // Warm-up
     nonce_grind_kernel<<<blocks, threads_per_block>>>(0, impossible_target, d_winning_nonce, d_found);
     CHECK_CUDA(cudaDeviceSynchronize());
 
-    // Actual Benchmark
     auto start = std::chrono::high_resolution_clock::now();
     
     int iterations = 1000;
@@ -114,16 +104,12 @@ void run_benchmark() {
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
     
-    double total_computed = total_hashes * iterations;
+    double total_computed = (double)total_hashes * iterations;
     double throughput_mh_s = (total_computed / diff.count()) / 1e6;
 
-    std::cout << "
-[RESULT] Computed " << total_computed << " field hashes in " << diff.count() << " seconds.
-";
-    std::cout << "[RESULT] \033[1;32mCUDA Throughput: " << throughput_mh_s << " Mh/s\033[0m
-";
-    std::cout << "=================================================
-";
+    std::cout << "\n[RESULT] Computed " << total_computed << " field hashes in " << diff.count() << " seconds.\n";
+    std::cout << "[RESULT] \033[1;32mCUDA Throughput: " << throughput_mh_s << " Mh/s\033[0m\n";
+    std::cout << "=================================================\n";
 
     cudaFree(d_winning_nonce);
     cudaFree(d_found);
@@ -133,16 +119,13 @@ void run_benchmark() {
 // 3. MAIN ENTRY
 // ------------------------------------------------------------------
 int main(int argc, char** argv) {
-    if (argc > 1 && std::strcmp(argv[1], "--benchmark") == 0) {
+    if (argc > 1 && std::string(argv[1]) == "--benchmark") {
         run_benchmark();
         return 0;
     }
 
-    std::cout << "[SYSTEM] Production CUDA Miner starting...
-";
-    std::cout << "Please use '--benchmark' to run the performance test.
-";
-    // Real Stratum pool logic would follow here, similar to the C++ version.
+    std::cout << "[SYSTEM] Production CUDA Miner starting...\n";
+    std::cout << "Please use '--benchmark' to run the performance test.\n";
     
     return 0;
 }
