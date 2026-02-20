@@ -86,8 +86,10 @@ __constant__ uint64_t P_DEV[6] = {0x8508c00000000001, 0x170b5d03340753bb, 0x6662
 __device__ __forceinline__ void add_mod_ptx(uint64_t* a, const uint64_t* b) {
     asm volatile("add.cc.u64 %0, %0, %6;\n\taddc.cc.u64 %1, %1, %7;\n\taddc.cc.u64 %2, %2, %8;\n\taddc.cc.u64 %3, %3, %9;\n\taddc.cc.u64 %4, %4, %10;\n\taddc.u64 %5, %5, %11;\n\t"
                  : "+l"(a[0]), "+l"(a[1]), "+l"(a[2]), "+l"(a[3]), "+l"(a[4]), "+l"(a[5]) : "l"(b[0]), "l"(b[1]), "l"(b[2]), "l"(b[3]), "l"(b[4]), "l"(b[5]));
-    if (a[5] >= P_DEV[5]) { #pragma unroll
-        for(int i=0; i<6; ++i) a[i] -= P_DEV[i]; }
+    if (a[5] >= P_DEV[5]) {
+        #pragma unroll
+        for(int i=0; i<6; ++i) a[i] -= P_DEV[i];
+    }
 }
 __global__ void gpu_bfly_kernel(uint64_t* soa, size_t off, size_t stride, uint64_t target, uint64_t* d_win, int* d_found) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x; size_t aidx = off + idx; if (aidx >= stride/2) return;
