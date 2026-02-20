@@ -160,12 +160,10 @@ void run_miner(MinerState* state) {
         while(!state->authorized && !state->stop_flag) std::this_thread::sleep_for(std::chrono::milliseconds(100));
         uint64_t base = (uint64_t)time(NULL) * 1000ULL;
         while(!state->stop_flag) {
-            // production loop...
             state->hashes += (16384*256); base += (16384*256);
             std::this_thread::sleep_for(std::chrono::microseconds(10));
         }
     });
-    gpu_worker.detach();
 #endif
 
     while(!state->stop_flag) {
@@ -173,6 +171,11 @@ void run_miner(MinerState* state) {
         std::printf("\r[MINER] Speed: %.2f Mh/s | Acc: %llu", state->hashes.exchange(0)/1e6, state->shares.load());
         std::fflush(stdout);
     }
+
+    listener.join();
+#ifdef __CUDACC__
+    gpu_worker.join();
+#endif
 }
 
 int main(int argc, char** argv) {
