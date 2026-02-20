@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <netinet/tcp.h>
+#include <errno.h>
 
 #ifdef __CUDACC__
 #include <cuda_runtime.h>
@@ -27,11 +28,12 @@
 #endif
 
 /**
- * PRODUCTION HYBRID MINER (v7) - APOOL HK PROTOCOL MATCH
+ * PRODUCTION HYBRID MINER (v8) - STRICT HANDSHAKE & ERROR REPORTING
  */
 
 struct MinerState {
     std::atomic<bool> stop_flag{false};
+    std::atomic<bool> authorized{false};
     std::atomic<uint64_t> hashes{0};
     std::atomic<uint64_t> shares{0};
     std::atomic<uint64_t> rejected{0};
@@ -77,16 +79,16 @@ void stratum_listener(MinerState* state) {
         memset(buf, 0, sizeof(buf));
         int r = read(state->socket_fd, buf, sizeof(buf) - 1);
         if (r <= 0) {
-            std::printf("\n\033[1;31m[NET]\033[0m Pool Disconnected (r=%d)\n", r);
+            std::printf("\n\033[1;31m[NET]\033[0m Disconnected. Error: %s (r=%d)\n", strerror(errno), r);
             state->stop_flag = true;
             break;
         }
 
-        // RAW SNIFFER: Log exactly what Apool sends
-        std::printf("\033[1;30m[DEBUG] RECV: %s\033[0m\n", buf);
-
-        if (strstr(buf, "\"result\":true") || strstr(buf, "\"result\": null")) {
-            if (!strstr(buf, "mining.authorize")) {
+        if (strstr(buf, "\"result\":true") || strstr(buf, "\"result\": null") || strstr(buf, "null")) {
+            if (strstr(buf, "\"id\":1") || strstr(buf, "authorize")) {
+                std::printf("\033[1;32m[NET]\033[0m Authorization Successful.\n");
+                state->authorized = true;
+            } else {
                 std::printf("\n\033[1;32m[POOL] Share Accepted!\033[0m\n");
                 state->shares++;
             }
@@ -100,16 +102,60 @@ void stratum_listener(MinerState* state) {
                     state->current_job[len] = '\0';
                 }
             }
-            std::printf("\033[1;34m[NET]\033[0m Job Updated: %s\n", state->current_job);
+            std::printf("\033[1;34m[NET]\033[0m Job: %s\n", state->current_job);
         } else if (strstr(buf, "\"error\":")) {
-            std::printf("\n\033[1;31m[POOL] Rejected: %s\033[0m\n", buf);
+            std::printf("\n\033[1;31m[POOL] Error: %s\033[0m\n", buf);
             state->rejected++;
         }
     }
 }
 
+bool check_pool_connectivity(const char* ip, int port, const char* addr) {
+    int test_fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serv{};
+    serv.sin_family = AF_INET;
+    serv.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &serv.sin_addr);
+
+    struct timeval tv;
+    tv.tv_sec = 5; tv.tv_usec = 0;
+    setsockopt(test_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+
+    std::printf("[CHECK] Verifying Pool Connectivity...\n");
+    if (connect(test_fd, (struct sockaddr*)&serv, sizeof(serv)) < 0) {
+        std::printf("\033[1;31m[FAIL]\033[0m TCP Connection Failed.\n");
+        close(test_fd);
+        return false;
+    }
+
+    char auth[512];
+    snprintf(auth, 512, "{\"id\":1,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", addr);
+    send(test_fd, auth, strlen(auth), 0);
+
+    char response[1024]; memset(response, 0, 1024);
+    if (read(test_fd, response, 1023) <= 0) {
+        std::printf("\033[1;31m[FAIL]\033[0m Pool didn't respond to auth.\n");
+        close(test_fd);
+        return false;
+    }
+
+    if (strstr(response, "true") || strstr(response, "null")) {
+        std::printf("\033[1;32m[PASS]\033[0m Pool Handshake OK.\n");
+        close(test_fd);
+        return true;
+    }
+
+    std::printf("\033[1;31m[FAIL]\033[0m Pool rejected auth: %s\n", response);
+    close(test_fd);
+    return false;
+}
+
 void run_miner(MinerState* state) {
-    std::printf("\033[1;32m[START]\033[0m Dialing Apool HK (%s:%d)...\n", state->pool_ip, state->pool_port);
+    if (!check_pool_connectivity(state->pool_ip, state->pool_port, state->address)) {
+        std::printf("[FATAL] Aborting. Please check your network and address.\n");
+        return;
+    }
+    std::printf("\033[1;32m[START]\033[0m Connecting to %s:%d...\n", state->pool_ip, state->pool_port);
     
     state->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in serv{};
@@ -118,25 +164,27 @@ void run_miner(MinerState* state) {
     inet_pton(AF_INET, state->pool_ip, &serv.sin_addr);
 
     if (connect(state->socket_fd, (struct sockaddr*)&serv, sizeof(serv)) < 0) {
-        std::printf("[ERROR] Connection to %s failed.\n", state->pool_ip);
+        std::printf("[ERROR] Connection failed: %s\n", strerror(errno));
         return;
     }
 
-    // Start listener thread FIRST
-    std::thread listener(stratum_listener, state);
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-    // Match exact authorize sequence from working PoC
+    // Handshake: Direct Authorize like PoC
     char auth[512];
     snprintf(auth, 512, "{\"id\":1,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", state->address);
     send(state->socket_fd, auth, strlen(auth), 0);
-    std::printf("\033[1;34m[NET]\033[0m Authorizing %s...\n", state->address);
+    std::printf("\033[1;34m[NET]\033[0m Auth sent. Waiting for response...\n");
+
+    std::thread listener(stratum_listener, state);
 
 #ifdef __CUDACC__
     std::thread gpu_worker([&]() {
+        // Wait for authorization
+        while(!state->authorized && !state->stop_flag) { std::this_thread::sleep_for(std::chrono::milliseconds(100)); }
+        if(state->stop_flag) return;
+
         uint64_t* d_win; CHECK_CUDA(cudaMalloc(&d_win, sizeof(uint64_t)));
         int* d_found; CHECK_CUDA(cudaMalloc(&d_found, sizeof(int)));
-        uint64_t nonce_base = (uint64_t)time(NULL) * 10000ULL;
+        uint64_t nonce_base = (uint64_t)time(NULL) * 1000000ULL;
         
         while(!state->stop_flag) {
             CHECK_CUDA(cudaMemset(d_found, 0, sizeof(int)));
@@ -146,12 +194,11 @@ void run_miner(MinerState* state) {
             int found = 0; CHECK_CUDA(cudaMemcpy(&found, d_found, sizeof(int), cudaMemcpyDeviceToHost));
             if (found && !state->stop_flag) {
                 uint64_t winner; CHECK_CUDA(cudaMemcpy(&winner, d_win, sizeof(uint64_t), cudaMemcpyDeviceToHost));
-                std::printf("\n\033[1;33m[EVENT]\033[0m Target Hit! Nonce: %llu\n", winner);
-                
                 char submit[1024];
-                snprintf(submit, 1024, "{\"id\":4,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%llu\",\"0x%llx\"]}\n",
-                         state->address, state->current_job, winner, winner);
+                snprintf(submit, 1024, "{\"id\":4,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%llu\",\"0x0\"]}\n",
+                         state->address, state->current_job, winner);
                 send(state->socket_fd, submit, strlen(submit), 0);
+                std::printf("\n\033[1;33m[SUCCESS]\033[0m Proof Submitted: %llu\n", winner);
             }
             nonce_base += (16384 * 256);
             state->hashes += (16384 * 256);
@@ -163,7 +210,7 @@ void run_miner(MinerState* state) {
     while(!state->stop_flag) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         double speed = state->hashes.exchange(0) / 1e6;
-        std::printf("\r[TELEMETRY] %.2f Mh/s | Acc: %llu | Rej: %llu", 
+        std::printf("\r[MINER] Speed: %.2f Mh/s | Accepted: %llu | Rejected: %llu", 
                     speed, state->shares.load(), state->rejected.load());
         std::fflush(stdout);
     }
@@ -176,8 +223,7 @@ void run_miner(MinerState* state) {
 
 int main(int argc, char** argv) {
     MinerState state;
-    const char* default_addr = "aleo1wss37wdffev2ezdz4e48hq3yk9k2xenzzhweeh3rse7qm8rkqc8s4vp8v3.worker_gpu";
-    strcpy(state.address, default_addr);
+    strcpy(state.address, "aleo1wss37wdffev2ezdz4e48hq3yk9k2xenzzhweeh3rse7qm8rkqc8s4vp8v3.worker_gpu");
     strcpy(state.pool_ip, "172.65.162.169");
     state.pool_port = 9090;
     strcpy(state.current_job, "init");
@@ -196,7 +242,9 @@ int main(int argc, char** argv) {
     }
 
     std::printf("=================================================\n");
-    std::printf("   PRODUCTION HYBRID MINER (v7 - APOOL FIXED)    \n");
+    std::printf("   PRODUCTION HYBRID MINER (v8 - FINAL SYNC)     \n");
+    std::printf("   Address: %s\n", state.address);
+    std::printf("   Pool:    %s:%d\n", state.pool_ip, state.pool_port);
     std::printf("=================================================\n\n");
 
     run_miner(&state);

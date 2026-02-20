@@ -1,53 +1,61 @@
 import socket
-import ssl
 import json
-import asyncio
-import websockets
+import time
+import sys
 
-# Direct IPs to bypass local DNS blocks
-POOL_CONFIG = [
-    {"name": "zkWork (HK)", "host": "aleo.hk.zk.work", "ip": "47.243.163.37", "port": 10003, "type": "tcp"},
-    {"name": "f2pool (SSL)", "host": "aleo.f2pool.com", "ip": "172.65.186.4", "port": 4420, "type": "ssl"},
-    {"name": "Antpool", "host": "aleo.antpool.com", "ip": "172.65.186.4", "port": 9038, "type": "tcp"},
-    {"name": "Apool (HK)", "host": "aleo1.hk.apool.io", "ip": "172.65.162.169", "port": 9090, "type": "tcp"},
-    {"name": "ZKRush (WSS)", "url": "wss://aleo.zkrush.com:3333", "type": "wss"}
-]
-
-def test_tcp_ssl(config):
-    target = config["ip"]
-    port = config["port"]
+def audit_pool(ip, port, address):
+    print(f"--- APOOL HK AUDIT: {ip}:{port} ---")
+    print(f"Testing Address: {address}")
+    
     try:
-        sock = socket.create_connection((target, port), timeout=5)
-        if config["type"] == "ssl":
-            context = ssl.create_default_context()
-            sock = context.wrap_socket(sock, server_hostname=config["host"])
+        # 1. TCP Handshake
+        print(f"[1/3] Attempting TCP Connection...", end="", flush=True)
+        s = socket.create_connection((ip, port), timeout=5)
+        print(" OK")
         
-        payload = json.dumps({"id": 1, "method": "mining.subscribe", "params": []}) + "\n"
-        sock.sendall(payload.encode())
-        sock.close()
-        return True
-    except:
-        return False
-
-async def test_wss(config):
-    try:
-        # Use a shorter timeout for the handshake
-        async with websockets.connect(config["url"], open_timeout=5) as ws:
-            return True
-    except:
-        return False
-
-async def main():
-    print("--- Full Aleo Pool Connectivity Report (uv/websockets) ---")
-    for pool in POOL_CONFIG:
-        if pool["type"] == "wss":
-            success = await test_wss(pool)
+        # 2. Authorization
+        print(f"[2/3] Sending mining.authorize...", end="", flush=True)
+        auth_msg = {
+            "id": 1,
+            "method": "mining.authorize",
+            "params": [address, "x"]
+        }
+        s.sendall((json.dumps(auth_msg) + "\n").encode())
+        
+        response = s.recv(4096).decode()
+        print(" OK")
+        print(f"      RAW RESPONSE: {response.strip()}")
+        
+        if "result\":true" in response or "result\": null" in response:
+            print("\033[1;32m[PASS] Pool is accepting our credentials.\033[0m")
         else:
-            success = test_tcp_ssl(pool)
+            print("\033[1;31m[FAIL] Pool rejected authorization.\033[0m")
+            return
+            
+        # 3. Work Subscription
+        print(f"[3/3] Waiting for mining.notify (Work)...", end="", flush=True)
+        s.settimeout(10)
+        work = s.recv(4096).decode()
+        if "mining.notify" in work:
+            print(" OK")
+            print(f"      WORK RECEIVED: {work[:100]}...")
+            print("\033[1;32m[SUCCESS] Full Stratum Pipeline Verified.\033[0m")
+        else:
+            print(" TIMEOUT/INVALID")
+            print(f"      RESPONSE: {work.strip()}")
+            
+        s.close()
         
-        status = "REACHABLE" if success else "BLOCKED"
-        color = "\033[1;32m" if success else "\033[1;31m"
-        print(f"{pool['name']:<15} : {color}{status}\033[0m")
+    except Exception as e:
+        print(f"\n\033[1;31m[CRITICAL ERROR] {str(e)}\033[0m")
+        print("Check if port 9090 is blocked by your firewall or if the IP is correct.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    addr = "aleo1wss37wdffev2ezdz4e48hq3yk9k2xenzzhweeh3rse7qm8rkqc8s4vp8v3.worker_audit"
+    pool_ip = "172.65.162.169"
+    pool_port = 9090
+    
+    if len(sys.argv) > 1:
+        addr = sys.argv[1]
+    
+    audit_pool(pool_ip, pool_port, addr)
