@@ -126,7 +126,10 @@ __constant__ uint64_t R_DEV[4] = {0x0000000000000001, 0x59aa8673d3f7c8d0, 0x60b4
 __device__ __forceinline__ void add_mod_256(uint64_t* a, const uint64_t* b) {
     asm volatile("add.cc.u64 %0, %0, %4;\n\taddc.cc.u64 %1, %1, %5;\n\taddc.cc.u64 %2, %2, %6;\n\taddc.u64 %3, %3, %7;\n\t"
                  : "+l"(a[0]), "+l"(a[1]), "+l"(a[2]), "+l"(a[3]) : "l"(b[0]), "l"(b[1]), "l"(b[2]), "l"(b[3]));
-    if (a[3] > R_DEV[3] || (a[3] == R_DEV[3] && a[2] >= R_DEV[2])) { #pragma unroll for(int i=0; i<4; ++i) a[i] -= R_DEV[i]; }
+    if (a[3] > R_DEV[3] || (a[3] == R_DEV[3] && a[2] >= R_DEV[2])) {
+        #pragma unroll 
+        for(int i=0; i<4; ++i) a[i] -= R_DEV[i];
+    }
 }
 __global__ void synthesize_init_kernel(uint64_t* soa, size_t n, uint64_t base, uint64_t c0, uint64_t c1, uint64_t c2, uint64_t c3) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
