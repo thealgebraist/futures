@@ -29,7 +29,7 @@
 #endif
 
 /**
- * PRODUCTION HYBRID MINER (v16 - CHINA OPTIMIZED)
+ * PRODUCTION HYBRID MINER (v17 - USA OPTIMIZED)
  * Target: RTX 5090 / Blackwell sm_90
  */
 
@@ -48,15 +48,15 @@ struct MinerState {
 
 struct PoolConfig { const char* name; const char* target; int port; };
 
-// v16 - Focus on Asia/HK nodes for China-based servers
+// v17 - Prioritizing USA nodes for the new cluster location
 PoolConfig AUDIT_POOLS[] = {
+    {"Apool US (Direct)", "172.65.230.151", 9090},
+    {"Apool US (URL)", "aleo1.us.apool.io", 9090},
+    {"ZkWork US (Direct)", "172.65.230.151", 10003},
+    {"WhalePool US", "aleo.us1.whalepool.com", 42343},
     {"Apool HK (Direct)", "172.65.162.169", 9090},
     {"ZkWork HK (Direct)", "47.243.163.37", 10003},
-    {"ZkWork Asia1 (IP)", "18.166.149.18", 10003},
-    {"AntPool Aleo", "172.65.162.169", 9038},
-    {"F2Pool Asia", "47.52.166.182", 4400},
-    {"WhalePool Asia", "172.65.232.193", 42343},
-    {"Oula Asia", "47.237.70.148", 6666}
+    {"F2Pool Global", "aleo.f2pool.com", 4400}
 };
 
 bool resolve_hostname(const char* hostname, int port, struct sockaddr_in* addr) {
@@ -64,15 +64,12 @@ bool resolve_hostname(const char* hostname, int port, struct sockaddr_in* addr) 
     addr->sin_port = htons(port);
     if (inet_pton(AF_INET, hostname, &addr->sin_addr) == 1) return true;
 
-    // Hardcoded bypass for CN servers
     const char* fallback_ip = nullptr;
-    if (strstr(hostname, "apool.io")) fallback_ip = "172.65.162.169";
-    else if (strstr(hostname, "zk.work")) {
-        if (strstr(hostname, "asia1")) fallback_ip = "18.166.149.18";
-        else fallback_ip = "47.243.163.37";
-    }
+    if (strstr(hostname, "apool.io")) {
+        if (strstr(hostname, ".us")) fallback_ip = "172.65.230.151";
+        else fallback_ip = "172.65.162.169";
+    } else if (strstr(hostname, "zk.work")) fallback_ip = "47.243.163.37";
     else if (strstr(hostname, "f2pool.com")) fallback_ip = "47.52.166.182";
-    else if (strstr(hostname, "antpool.com")) fallback_ip = "172.65.162.169";
 
     if (fallback_ip) {
         inet_pton(AF_INET, fallback_ip, &addr->sin_addr);
@@ -117,11 +114,10 @@ void stratum_listener(MinerState* state) {
         int r = read(state->socket_fd, buf, sizeof(buf) - 1);
         if (r <= 0) { state->stop_flag = true; break; }
         if (strstr(buf, "\"result\":true") || strstr(buf, "null") || strstr(buf, "1")) {
-            if (strstr(buf, "\"id\":1") || strstr(buf, "\"id\":2")) state->authorized = true;
+            if (strstr(buf, "\"id\":1")) state->authorized = true;
             else if (strstr(buf, "\"id\":4")) state->shares++;
         } else if (strstr(buf, "mining.notify")) {
-            // Extract Job ID if possible, otherwise use a generic one
-            strcpy(state->current_job, "job_asia_v16");
+            strcpy(state->current_job, "job_us_v17");
         }
     }
 }
@@ -130,15 +126,11 @@ bool check_pool_connectivity(const char* target, int port, const char* addr) {
     struct sockaddr_in serv{};
     if (!resolve_hostname(target, port, &serv)) return false;
     int fd = socket(AF_INET, SOCK_STREAM, 0);
-    struct timeval tv; tv.tv_sec = 4; tv.tv_usec = 0; // Slightly longer for GFW
+    struct timeval tv; tv.tv_sec = 2; tv.tv_usec = 0;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
     if (connect(fd, (struct sockaddr*)&serv, sizeof(serv)) < 0) { close(fd); return false; }
     
-    // China nodes often require Subscribe first
-    const char* sub = "{\"id\":1,\"method\":\"mining.subscribe\",\"params\":[\"aleo-miner/1.0.0\",null]}\n";
-    send(fd, sub, strlen(sub), 0);
-    
-    char auth[512]; snprintf(auth, 512, "{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", addr);
+    char auth[512]; snprintf(auth, 512, "{\"id\":1,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", addr);
     send(fd, auth, strlen(auth), 0);
     
     char resp[1024]; memset(resp, 0, 1024);
@@ -158,18 +150,14 @@ void run_miner(MinerState* state) {
         }
         std::printf("\033[1;31mFAIL\033[0m\n"); std::fflush(stdout);
     }
-    if (!connected) { std::printf("[FATAL] All China/Asia targets failed. Check cluster firewall.\n"); return; }
+    if (!connected) { std::printf("[FATAL] All USA/Global targets failed. Check cluster firewall.\n"); return; }
 
     struct sockaddr_in serv{}; resolve_hostname(state->pool_url, state->pool_port, &serv);
     state->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     connect(state->socket_fd, (struct sockaddr*)&serv, sizeof(serv));
     std::thread listener(stratum_listener, state);
     
-    // Full Handshake
-    const char* sub = "{\"id\":1,\"method\":\"mining.subscribe\",\"params\":[\"aleo-miner/1.0.0\",null]}\n";
-    send(state->socket_fd, sub, strlen(sub), 0);
-    
-    char auth[512]; snprintf(auth, 512, "{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", state->address);
+    char auth[512]; snprintf(auth, 512, "{\"id\":1,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", state->address);
     send(state->socket_fd, auth, strlen(auth), 0);
 
 #ifdef __CUDACC__
@@ -194,7 +182,7 @@ void run_miner(MinerState* state) {
     });
 #endif
 
-    std::printf("\033[1;32m[NET]\033[0m Mining on %s\n", state->pool_url); std::fflush(stdout);
+    std::printf("\033[1;32m[NET]\033[0m Mining on %s (USA Optimized)\n", state->pool_url); std::fflush(stdout);
     while(!state->stop_flag) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         std::printf("\r[MINER] Speed: %.2f Mh/s | Acc: %llu", state->hashes.exchange(0)/1e6, state->shares.load());
@@ -212,7 +200,7 @@ int main(int argc, char** argv) {
         }
     }
     std::printf("=================================================\n");
-    std::printf("   PRODUCTION HYBRID MINER (v16 - CHINA READY)   \n");
+    std::printf("   PRODUCTION HYBRID MINER (v17 - USA READY)     \n");
     std::printf("   Address: %s\n", state.address);
     std::printf("=================================================\n");
     std::fflush(stdout);
