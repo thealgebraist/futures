@@ -27,7 +27,7 @@
 #endif
 
 /**
- * PRODUCTION HYBRID MINER (v6) - OPTIMIZED STRATUM HANDSHAKE
+ * PRODUCTION HYBRID MINER (v7) - APOOL HK PROTOCOL MATCH
  */
 
 struct MinerState {
@@ -77,15 +77,19 @@ void stratum_listener(MinerState* state) {
         memset(buf, 0, sizeof(buf));
         int r = read(state->socket_fd, buf, sizeof(buf) - 1);
         if (r <= 0) {
-            std::printf("\n\033[1;31m[NET]\033[0m Pool closed connection (r=%d). Shutting down.\n", r);
+            std::printf("\n\033[1;31m[NET]\033[0m Pool Disconnected (r=%d)\n", r);
             state->stop_flag = true;
             break;
         }
 
-        // Print raw responses for debugging if needed
-        if (strstr(buf, "\"result\":true") || strstr(buf, "\"result\":true")) {
-            std::printf("\n\033[1;32m[POOL]\033[0m Response: OK (Authorized/Accepted)\n");
-            if (strstr(buf, "mining.submit")) state->shares++;
+        // RAW SNIFFER: Log exactly what Apool sends
+        std::printf("\033[1;30m[DEBUG] RECV: %s\033[0m\n", buf);
+
+        if (strstr(buf, "\"result\":true") || strstr(buf, "\"result\": null")) {
+            if (!strstr(buf, "mining.authorize")) {
+                std::printf("\n\033[1;32m[POOL] Share Accepted!\033[0m\n");
+                state->shares++;
+            }
         } else if (strstr(buf, "mining.notify")) {
             char* p = strstr(buf, "[\"");
             if (p) {
@@ -96,7 +100,7 @@ void stratum_listener(MinerState* state) {
                     state->current_job[len] = '\0';
                 }
             }
-            std::printf("\n\033[1;34m[NET]\033[0m Received Work: %s\n", state->current_job);
+            std::printf("\033[1;34m[NET]\033[0m Job Updated: %s\n", state->current_job);
         } else if (strstr(buf, "\"error\":")) {
             std::printf("\n\033[1;31m[POOL] Rejected: %s\033[0m\n", buf);
             state->rejected++;
@@ -105,37 +109,34 @@ void stratum_listener(MinerState* state) {
 }
 
 void run_miner(MinerState* state) {
-    std::printf("\033[1;32m[START]\033[0m Establishing TCP to %s:%d...\n", state->pool_ip, state->pool_port);
+    std::printf("\033[1;32m[START]\033[0m Dialing Apool HK (%s:%d)...\n", state->pool_ip, state->pool_port);
     
     state->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-    int flag = 1;
-    setsockopt(state->socket_fd, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
-
     struct sockaddr_in serv{};
     serv.sin_family = AF_INET;
     serv.sin_port = htons(state->pool_port);
     inet_pton(AF_INET, state->pool_ip, &serv.sin_addr);
 
     if (connect(state->socket_fd, (struct sockaddr*)&serv, sizeof(serv)) < 0) {
-        std::printf("[ERROR] Failed to connect to IP %s\n", state->pool_ip);
+        std::printf("[ERROR] Connection to %s failed.\n", state->pool_ip);
         return;
     }
 
-    // Start listener BEFORE handshake
+    // Start listener thread FIRST
     std::thread listener(stratum_listener, state);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    // Send Authorization (The most critical packet)
+    // Match exact authorize sequence from working PoC
     char auth[512];
-    snprintf(auth, 512, "{\"id\":1,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"\"]}\n", state->address);
-    std::printf("\033[1;34m[NET]\033[0m Sending Authorize: %s", auth);
+    snprintf(auth, 512, "{\"id\":1,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"x\"]}\n", state->address);
     send(state->socket_fd, auth, strlen(auth), 0);
+    std::printf("\033[1;34m[NET]\033[0m Authorizing %s...\n", state->address);
 
 #ifdef __CUDACC__
     std::thread gpu_worker([&]() {
         uint64_t* d_win; CHECK_CUDA(cudaMalloc(&d_win, sizeof(uint64_t)));
         int* d_found; CHECK_CUDA(cudaMalloc(&d_found, sizeof(int)));
-        uint64_t nonce_base = (uint64_t)time(NULL) * 1000000ULL;
+        uint64_t nonce_base = (uint64_t)time(NULL) * 10000ULL;
         
         while(!state->stop_flag) {
             CHECK_CUDA(cudaMemset(d_found, 0, sizeof(int)));
@@ -145,11 +146,11 @@ void run_miner(MinerState* state) {
             int found = 0; CHECK_CUDA(cudaMemcpy(&found, d_found, sizeof(int), cudaMemcpyDeviceToHost));
             if (found && !state->stop_flag) {
                 uint64_t winner; CHECK_CUDA(cudaMemcpy(&winner, d_win, sizeof(uint64_t), cudaMemcpyDeviceToHost));
-                std::printf("\n\033[1;33m[SUCCESS]\033[0m Hit target! Nonce: %llu\n", winner);
+                std::printf("\n\033[1;33m[EVENT]\033[0m Target Hit! Nonce: %llu\n", winner);
                 
                 char submit[1024];
-                snprintf(submit, 1024, "{\"id\":4,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%llu\",\"0x0\"]}\n",
-                         state->address, state->current_job, winner);
+                snprintf(submit, 1024, "{\"id\":4,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%llu\",\"0x%llx\"]}\n",
+                         state->address, state->current_job, winner, winner);
                 send(state->socket_fd, submit, strlen(submit), 0);
             }
             nonce_base += (16384 * 256);
@@ -162,7 +163,7 @@ void run_miner(MinerState* state) {
     while(!state->stop_flag) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         double speed = state->hashes.exchange(0) / 1e6;
-        std::printf("\r[MINER] Speed: %.2f Mh/s | Accepted: %llu | Rejected: %llu", 
+        std::printf("\r[TELEMETRY] %.2f Mh/s | Acc: %llu | Rej: %llu", 
                     speed, state->shares.load(), state->rejected.load());
         std::fflush(stdout);
     }
@@ -184,7 +185,7 @@ int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--address") == 0 && i + 1 < argc) {
             strcpy(state.address, argv[++i]);
-            if (strchr(state.address, '.') == NULL) strcat(state.address, ".worker_gpu");
+            if (strchr(state.address, '.') == NULL) strcat(state.address, ".worker_5090");
         }
         if (strcmp(argv[i], "--pool") == 0 && i + 1 < argc) {
             char* p = strchr(argv[i+1], ':');
@@ -195,8 +196,7 @@ int main(int argc, char** argv) {
     }
 
     std::printf("=================================================\n");
-    std::printf("   PRODUCTION HYBRID MINER (v6)                  \n");
-    std::printf("   Target: RTX 5090 Blackwell                    \n");
+    std::printf("   PRODUCTION HYBRID MINER (v7 - APOOL FIXED)    \n");
     std::printf("=================================================\n\n");
 
     run_miner(&state);
