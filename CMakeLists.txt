@@ -4,17 +4,15 @@ project(AleoOptimizedMiner LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 1. Dependency Discovery
+# 1. Dependency Discovery (Ubuntu Standard Paths)
 find_package(Threads REQUIRED)
-find_package(OpenSSL REQUIRED)
 find_package(CURL REQUIRED)
-message(STATUS "CURL Found: ${CURL_VERSION}")
+find_package(OpenSSL REQUIRED)
 
-# 2. Platform Detection
-if(APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
-    add_compile_options(-march=native -O3)
-elseif(UNIX AND NOT APPLE)
-    add_compile_options(-mavx2 -march=native -O3)
+# 2. Linux Optimization Flags
+if(UNIX AND NOT APPLE)
+    message(STATUS "Targeting Linux x86_64 (AVX2 + sm_90 Enabled)")
+    add_compile_options(-mavx2 -march=native -O3 -pthread)
 endif()
 
 # 3. CUDA Support Detection
