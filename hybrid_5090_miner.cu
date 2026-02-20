@@ -11,10 +11,9 @@
 #include <netdb.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#include <sqlite3.h>
 
-#ifdef __aarch64__
-#include <arm_neon.h>
+#ifdef USE_SQLITE
+#include <sqlite3.h>
 #endif
 
 #ifdef __CUDACC__
@@ -32,8 +31,10 @@ struct MinerState {
     char pool_url[128] = "aleo-us.f2pool.com";
     int pool_port = 4420;
     std::atomic<uint64_t> current_target{0x0000000000000FFFULL};
-    char current_job[128] = "job_v69";
+    char current_job[128] = "job_v70";
+#ifdef USE_SQLITE
     sqlite3* db{nullptr};
+#endif
     SSL* ssl_handle{nullptr};
     SSL_CTX* ssl_ctx{nullptr};
     int socket_fd{-1};
@@ -43,8 +44,10 @@ struct MinerState {
 // PERSISTENCE & NETWORK
 // ------------------------------------------------------------------
 void init_db(MinerState* state) {
+#ifdef USE_SQLITE
     sqlite3_open("shares_cache.db", &state->db);
     sqlite3_exec(state->db, "CREATE TABLE IF NOT EXISTS shares (job_id TEXT, nonce UNSIGNED BIG INT);", 0, 0, 0);
+#endif
 }
 
 bool connect_ssl(MinerState* state) {
@@ -72,7 +75,7 @@ void stratum_listener(MinerState* state) {
         }
         if (char* notify = strstr(buf, "mining.notify")) {
             char* p = strstr(notify, "[\"");
-            if (p) { p+=2; char* e = strchr(p, '\"'); if(e){ strncpy(state->current_job, p, e-p); state->current_job[e-p] = '\0'; } }
+            if (p) { p+=2; char* e = strchr(p, '\"'); if(e){ strncpy(state->current_job, p, e-p); state->current_job[end-p] = '\0'; } }
         }
     }
     state->connected = false; state->authorized = false;
@@ -84,7 +87,8 @@ void stratum_listener(MinerState* state) {
 #ifdef __CUDACC__
 __constant__ uint64_t P_DEV[6] = {0x8508c00000000001, 0x170b5d03340753bb, 0x6662b035c4c2002f, 0x1c37f37483c6d17b, 0x247a514d503b2f01, 0x01ae3a4617c30035};
 __device__ __forceinline__ void add_mod_ptx(uint64_t* a, const uint64_t* b) {
-    asm volatile("add.cc.u64 %0, %0, %6;\n\taddc.cc.u64 %1, %1, %7;\n\taddc.cc.u64 %2, %2, %8;\n\taddc.cc.u64 %3, %3, %9;\n\taddc.cc.u64 %4, %4, %10;\n\taddc.u64 %5, %5, %11;\n\t"
+    asm volatile("add.cc.u64 %0, %0, %6;\n\taddc.cc.u64 %1, %1, %7;\n\taddc.cc.u64 %2, %2, %8;\n\t"
+                 "addc.cc.u64 %3, %3, %9;\n\taddc.cc.u64 %4, %4, %10;\n\taddc.u64 %5, %5, %11;\n\t"
                  : "+l"(a[0]), "+l"(a[1]), "+l"(a[2]), "+l"(a[3]), "+l"(a[4]), "+l"(a[5]) : "l"(b[0]), "l"(b[1]), "l"(b[2]), "l"(b[3]), "l"(b[4]), "l"(b[5]));
     if (a[5] >= P_DEV[5]) {
         #pragma unroll
@@ -108,7 +112,8 @@ void run_miner(MinerState* state) {
             auto now = std::chrono::steady_clock::now();
             double dt = std::chrono::duration_cast<std::chrono::milliseconds>(now - lt).count() / 1000.0;
             uint64_t cb = state->total_bfly.load();
-            std::printf("\r\033[2K\033[1;37m[MINER]\033[0m \033[1;32m%.2f M-Bfly/s\033[0m | \033[1;33mAcc: %llu\033[0m | \033[1;34m%s\033[0m", (double)(cb-lb)/dt/1e6, state->shares.load(), state->authorized ? "LIVE":"WAIT");
+            std::printf("\r\033[2K\033[1;37m[MINER]\033[0m \033[1;32m%.2f M-Bfly/s\033[0m | \033[1;33mAcc: %llu\033[0m | \033[1;34m%s\033[0m", 
+                        (double)(cb-lb)/(dt > 0 ? dt : 1.0)/1e6, (unsigned long long)state->shares.load(), state->authorized ? "LIVE":"WAIT");
             lb = cb; lt = now; std::fflush(stdout);
         }
     });
@@ -133,6 +138,7 @@ void run_miner(MinerState* state) {
         }
 #endif
     }
+    telemetry.join();
 }
 
 int main(int argc, char** argv) {
