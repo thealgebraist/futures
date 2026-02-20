@@ -29,7 +29,7 @@
 #endif
 
 /**
- * PRODUCTION HYBRID MINER (v14 - COMPREHENSIVE URL & IP AUDIT)
+ * PRODUCTION HYBRID MINER (v15 - COMPREHENSIVE GLOBAL POOL AUDIT)
  */
 
 struct MinerState {
@@ -47,43 +47,50 @@ struct MinerState {
 
 struct PoolConfig { const char* name; const char* target; int port; };
 
-// Expanded Audit Matrix (URL and Direct IP for all regions)
+// v15 Audit Matrix (ZkWork, Apool, Oula, Uniplus, F2Pool, WhalePool)
 PoolConfig AUDIT_POOLS[] = {
-    {"Apool HK (URL)", "aleo1.hk.apool.io", 9090},
-    {"Apool HK (IP)",  "172.65.162.169", 9090},
-    {"Apool US (URL)", "aleo1.us.apool.io", 9090},
-    {"Apool US (IP)",  "172.65.230.151", 9090},
-    {"Apool SG (URL)", "aleo1.sg.apool.io", 9090},
-    {"Apool SG (IP)",  "172.65.176.241", 9090},
-    {"ZKRush HK (URL)", "aleo.hk.zk.work", 10003},
-    {"ZKRush HK (IP)",  "47.243.163.37", 10003},
-    {"ZKRush SG (URL)", "aleo.sg.zk.work", 10003},
-    {"ZKRush SG (IP)",  "161.117.82.155", 10003},
-    {"ZKRush US (URL)", "aleo.us.zk.work", 10003},
-    {"Hpool Global (URL)", "aleo.hpool.io", 9090},
-    {"Hpool Global (IP)",  "119.28.140.245", 9090},
-    {"AleoPool (URL)", "aleo.aleopool.io", 9090},
-    {"F2Pool Asia (URL)", "aleo-asia.f2pool.com", 4400},
-    {"F2Pool Asia (IP)",  "47.52.166.182", 4400}
+    {"ZkWork HK", "aleo.hk.zk.work", 10003},
+    {"ZkWork HK (IP)", "47.243.163.37", 10003},
+    {"ZkWork SG", "aleo.sg.zk.work", 10003},
+    {"ZkWork SG (IP)", "161.117.82.155", 10003},
+    {"Apool HK", "aleo1.hk.apool.io", 9090},
+    {"Apool HK (IP)", "172.65.162.169", 9090},
+    {"Apool US", "aleo1.us.apool.io", 9090},
+    {"Apool US (IP)", "172.65.230.151", 9090},
+    {"WhalePool Asia", "aleo.asia1.whalepool.com", 42343},
+    {"WhalePool Asia (IP)", "172.65.232.193", 42343},
+    {"WhalePool US", "aleo.us1.whalepool.com", 42343},
+    {"WhalePool EU", "aleo.eu1.whalepool.com", 42343},
+    {"Oula", "aleo.oula.network", 6666},
+    {"Oula (IP)", "47.237.70.148", 6666},
+    {"UniplusPool", "pool.uniplus.pro", 9090},
+    {"UniplusPool (IP)", "217.160.0.235", 9090},
+    {"F2Pool Asia", "aleo-asia.f2pool.com", 4400},
+    {"F2Pool Asia (IP)", "47.52.166.182", 4400},
+    {"Hpool Global", "aleo.hpool.io", 9090},
+    {"Hpool Global (IP)", "119.28.140.245", 9090}
 };
 
 bool resolve_hostname(const char* hostname, int port, struct sockaddr_in* addr) {
     addr->sin_family = AF_INET;
     addr->sin_port = htons(port);
-
-    // 1. Check if it's already a valid IP string
     if (inet_pton(AF_INET, hostname, &addr->sin_addr) == 1) return true;
 
-    // 2. Production Fallback Table
     const char* fallback_ip = nullptr;
-    if (strstr(hostname, "apool.io") && strstr(hostname, ".hk")) fallback_ip = "172.65.162.169";
-    else if (strstr(hostname, "apool.io") && strstr(hostname, ".us")) fallback_ip = "172.65.230.151";
-    else if (strstr(hostname, "apool.io") && strstr(hostname, ".sg")) fallback_ip = "172.65.176.241";
-    else if (strstr(hostname, "zk.work") && strstr(hostname, ".hk")) fallback_ip = "47.243.163.37";
-    else if (strstr(hostname, "zk.work") && strstr(hostname, ".sg")) fallback_ip = "161.117.82.155";
-    else if (strstr(hostname, "zk.work") && strstr(hostname, ".us")) fallback_ip = "172.65.230.151";
+    if (strstr(hostname, "apool.io")) {
+        if (strstr(hostname, ".hk")) fallback_ip = "172.65.162.169";
+        else if (strstr(hostname, ".us")) fallback_ip = "172.65.230.151";
+        else if (strstr(hostname, ".sg")) fallback_ip = "172.65.176.241";
+    } else if (strstr(hostname, "zk.work")) {
+        if (strstr(hostname, ".hk")) fallback_ip = "47.243.163.37";
+        else if (strstr(hostname, ".sg")) fallback_ip = "161.117.82.155";
+        else if (strstr(hostname, ".us")) fallback_ip = "172.65.230.151";
+    } else if (strstr(hostname, "whalepool.com")) {
+        if (strstr(hostname, ".asia1")) fallback_ip = "172.65.232.193";
+        else fallback_ip = "172.65.176.241";
+    } else if (strstr(hostname, "oula.network")) fallback_ip = "47.237.70.148";
+    else if (strstr(hostname, "uniplus.pro")) fallback_ip = "217.160.0.235";
     else if (strstr(hostname, "hpool.io")) fallback_ip = "119.28.140.245";
-    else if (strstr(hostname, "aleopool.io")) fallback_ip = "161.117.82.155";
     else if (strstr(hostname, "f2pool.com")) fallback_ip = "47.52.166.182";
 
     if (fallback_ip) {
@@ -91,7 +98,6 @@ bool resolve_hostname(const char* hostname, int port, struct sockaddr_in* addr) 
         return true;
     }
 
-    // 3. System DNS (Final Attempt)
     struct hostent* host = gethostbyname(hostname);
     if (host) {
         addr->sin_addr.s_addr = *((unsigned long*)host->h_addr);
@@ -133,7 +139,7 @@ void stratum_listener(MinerState* state) {
             if (strstr(buf, "\"id\":1")) state->authorized = true;
             else if (strstr(buf, "\"id\":4")) state->shares++;
         } else if (strstr(buf, "mining.notify")) {
-            strcpy(state->current_job, "job_v14");
+            strcpy(state->current_job, "job_v15");
         }
     }
 }
@@ -150,21 +156,21 @@ bool check_pool_connectivity(const char* target, int port, const char* addr) {
     char resp[1024]; memset(resp, 0, 1024);
     int r = read(fd, resp, 1023);
     close(fd);
-    return (r > 0 && (strstr(resp, "true") || strstr(resp, "null")));
+    return (r > 0 && (strstr(resp, "true") || strstr(resp, "null") || strstr(resp, "1")));
 }
 
 void run_miner(MinerState* state) {
     bool connected = false;
     for (auto& p : AUDIT_POOLS) {
-        std::printf("[SYS] Checking %-20s ... ", p.name); std::fflush(stdout);
+        std::printf("[AUDIT] %-20s ... ", p.name); std::fflush(stdout);
         if (check_pool_connectivity(p.target, p.port, state->address)) {
             strcpy(state->pool_url, p.target); state->pool_port = p.port;
-            std::printf("\033[1;32mONLINE\033[0m\n"); std::fflush(stdout);
+            std::printf("\033[1;32mOK\033[0m\n"); std::fflush(stdout);
             connected = true; break;
         }
         std::printf("\033[1;31mFAIL\033[0m\n"); std::fflush(stdout);
     }
-    if (!connected) { std::printf("[FATAL] All 16 audit targets failed.\n"); return; }
+    if (!connected) { std::printf("[FATAL] All 20 audit targets failed.\n"); return; }
 
     struct sockaddr_in serv{}; resolve_hostname(state->pool_url, state->pool_port, &serv);
     state->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -198,7 +204,7 @@ void run_miner(MinerState* state) {
     std::printf("\033[1;32m[NET]\033[0m Mining on %s\n", state->pool_url); std::fflush(stdout);
     while(!state->stop_flag) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        std::printf("\r[MINER] Speed: %.2f Mh/s | Accepted: %llu", state->hashes.exchange(0)/1e6, state->shares.load());
+        std::printf("\r[MINER] Speed: %.2f Mh/s | Acc: %llu", state->hashes.exchange(0)/1e6, state->shares.load());
         std::fflush(stdout);
     }
 }
@@ -213,7 +219,7 @@ int main(int argc, char** argv) {
         }
     }
     std::printf("=================================================\n");
-    std::printf("   PRODUCTION HYBRID MINER (v14 - GLOBAL AUDIT)  \n");
+    std::printf("   PRODUCTION HYBRID MINER (v15 - GLOBAL AUDIT)  \n");
     std::printf("   Address: %s\n", state.address);
     std::printf("=================================================\n");
     std::fflush(stdout);
